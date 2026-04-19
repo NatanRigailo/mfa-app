@@ -1,0 +1,33 @@
+services:
+  mfa:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - mfa_data:/data
+    environment:
+      APP_NAME: MFA Tokens
+      # SECRET_KEY: troque-por-um-valor-seguro
+      # EDIT_PASS: senha-para-edicao
+      # REGISTER_ABLE: "true"
+      # LOG_LEVEL: INFO
+
+      # MySQL (opcional — remova o bloco abaixo para usar SQLite)
+      # DB_HOST: db
+      # DB_USER: mfa
+      # DB_PASSWORD: senha
+      # DB_DATABASE: mfa
+
+  # db:
+  #   image: mysql:8
+  #   environment:
+  #     MYSQL_DATABASE: mfa
+  #     MYSQL_USER: mfa
+  #     MYSQL_PASSWORD: senha
+  #     MYSQL_ROOT_PASSWORD: root
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+
+volumes:
+  mfa_data:
+  # mysql_data:

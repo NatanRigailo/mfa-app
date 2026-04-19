@@ -1,0 +1,9 @@
+Flask
+pyotp
+SQLAlchemy
+Flask-SQLAlchemy
+pyzbar
+Pillow
+waitress
+# MySQL (opcional — instale apenas se usar DB_HOST)
+# mysql-connector-python

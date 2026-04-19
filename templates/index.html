@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
+    <style>
+        body { background-color: #181818; color: #e0e0e0; font-family: Arial, sans-serif; }
+        .grid { grid-template-columns: repeat(6, 1fr); gap: 10px; padding: 20px; }
+        .token-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            padding: 10px;
+        }
+        .token-box {
+            border: 1px solid #444;
+            background-color: #202020;
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .token-content { display: flex; align-items: center; justify-content: space-between; }
+        .token-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+        .copy-msg { display: none; color: #4CAF50; font-style: italic; font-size: 0.8em; margin-top: 5px; }
+        .copy-btn {
+            background: url({{ url_for('static', filename='copy_button.png') }}) no-repeat center center / contain;
+            width: 32px; height: 32px;
+            border: none; cursor: pointer; margin-left: 10px;
+            background-color: transparent;
+        }
+        .copy-btn span { display: none; }
+        .collapsible { display: none; }
+        .letter-header {
+            cursor: pointer; padding: 10px; font-weight: bold;
+            background-color: #333; border-radius: 5px; margin-top: 15px;
+        }
+        progress { width: 100%; appearance: none; }
+        progress::-webkit-progress-bar { background-color: #444; }
+        progress::-webkit-progress-value { background-color: #4CAF50; }
+        progress.red::-webkit-progress-value { background-color: #FF0000; }
+        progress::-moz-progress-bar { background-color: #4CAF50; }
+        progress.red::-moz-progress-bar { background-color: #FF0000; }
+        #clock { font-size: 1.5em; text-align: center; margin-bottom: 20px; }
+        #search-container { display: flex; justify-content: center; margin: 20px 0; }
+        #search {
+            width: 50%; padding: 12px; font-size: 1.2em;
+            background-color: #202020; color: #e0e0e0;
+            border: 2px solid #444; border-radius: 5px; outline: none;
+        }
+        #search::placeholder { color: #888; }
+        #search:focus { border-color: #4CAF50; }
+    </style>
+</head>
+<body>
+    <div id="edit-toggle" style="position: absolute; top: 15px; right: 20px; cursor: pointer; font-size: 20px;" onclick="openEditPrompt()" title="Editar tokens"><i class="ph ph-pencil-simple"></i></div>
+    {% if edit_mode %}
+    <div style="position: fixed; bottom: 10px; right: 10px; background-color: #4CAF50; color: #fff; padding: 6px 10px; border-radius: 5px; font-size: 0.9em;">
+        Modo de edição ativo — clique o lápis e deixe vazio para sair
+    </div>
+    {% endif %}
+    <div id="clock"></div>
+    <div id="search-container">
+        <input type="text" id="search" placeholder="Buscar token..." onkeyup="filterTokens()">
+    </div>
+
+    <div id="search-results" class="token-grid" style="display: none;"></div>
+
+    <div id="grouped-tokens" class="grid">
+        {% for letter, tokens_list in grouped_tokens.items() %}
+            <div class="letter-section">
+                <div class="letter-header" onclick="toggleCollapse('{{ letter }}')">- {{ letter.upper() }}</div>
+                <div id="section-{{ letter }}" class="token-grid collapsible">
+                    {% for token in tokens_list %}
+                        <div class="token-box original-token-box" data-token-name="{{ token.name }}">
+                            {% if edit_mode %}
+                                <form method="POST" action="{{ url_for('index') }}">
+                                    <input type="text" name="name_{{ token.id }}" value="{{ token.name }}" style="width: 100%; margin-bottom: 5px; background-color: #303030; color: #e0e0e0; border: 1px solid #555; border-radius: 3px;">
+                                    <label style="font-size: 0.9em;">
+                                        <input type="checkbox" name="ativo_{{ token.id }}" {% if token.ativo %}checked{% endif %}> Ativo
+                                    </label>
+                            {% else %}
+                                    <div class="token-name" title="{{ token.name }}">{{ token.name }}</div>
+                                    <div class="token-content">
+                                        <div id="{{ token.name }}-code">Carregando...</div>
+                                        <button class="copy-btn" data-token-id="{{ token.name }}"><span>Copiar</span></button>
+                                    </div>
+                                    <div class="copy-msg" id="{{ token.name }}-copy-msg">Copiado!</div>
+                                    <progress id="{{ token.name }}-progress" max="30" value="30"></progress>
+                            {% endif %}
+                            {% if edit_mode %}
+                                    <button type="submit" style="margin-top: 5px; width: 100%; background-color: #4CAF50; border: none; color: #fff; border-radius: 3px; padding: 5px;">Salvar</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function openEditPrompt() {
+            const palavra = prompt("Digite a senha para editar (ou deixe vazio para sair):");
+            if (palavra !== null) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/toggle_edit';
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'palavra';
+                input.value = palavra;
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        function filterTokens() {
+            let input = document.getElementById('search').value.toLowerCase();
+            let groupedTokens = document.getElementById('grouped-tokens');
+            let searchResults = document.getElementById('search-results');
+            let tokenBoxes = document.querySelectorAll('.original-token-box');
+            let tokensFound = false;
+
+            searchResults.innerHTML = '';
+
+            if (input) {
+                groupedTokens.style.display = 'none';
+                searchResults.style.display = 'grid';
+
+                tokenBoxes.forEach(function(box) {
+                    let tokenName = box.getAttribute('data-token-name').toLowerCase();
+                    if (tokenName.includes(input)) {
+                        if (!box.classList.contains('in-search')) {
+                            let clonedBox = box.cloneNode(true);
+                            clonedBox.classList.add('in-search');
+                            searchResults.appendChild(clonedBox);
+
+                            let copyButton = clonedBox.querySelector('.copy-btn');
+                            copyButton.addEventListener('click', function(e) {
+                                const tokenId = e.target.getAttribute('data-token-id');
+                                const otpCodeElement = document.getElementById(tokenId + '-code');
+                                copyToClipboard(otpCodeElement.textContent);
+                                const copyMsgElement = document.getElementById(tokenId + '-copy-msg');
+                                copyMsgElement.style.display = 'block';
+                                setTimeout(() => { copyMsgElement.style.display = 'none'; }, 2000);
+                            });
+                        }
+                        tokensFound = true;
+                    }
+                });
+
+                if (!tokensFound) {
+                    searchResults.innerHTML = '<p>Nenhum token encontrado.</p>';
+                }
+            } else {
+                groupedTokens.style.display = '';
+                searchResults.style.display = 'none';
+                searchResults.innerHTML = '';
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+        }
+        updateClock();
+
+        function toggleCollapse(letter) {
+            const section = document.getElementById('section-' + letter);
+            section.style.display = (section.style.display === 'none' || section.style.display === '') ? 'grid' : 'none';
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).catch(err => console.error('Erro ao copiar:', err));
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            document.querySelectorAll('.copy-btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    const tokenId = e.target.getAttribute('data-token-id');
+                    copyToClipboard(document.getElementById(tokenId + '-code').textContent);
+                    const copyMsgElement = document.getElementById(tokenId + '-copy-msg');
+                    copyMsgElement.style.display = 'block';
+                    setTimeout(() => { copyMsgElement.style.display = 'none'; }, 2000);
+                });
+            });
+            fetchNewCodes();
+        });
+
+        function fetchNewCodes() {
+            fetch('/get_new_codes').then(r => r.json()).then(data => {
+                for (let name in data.codes) {
+                    try {
+                        document.getElementById(name + '-code').textContent = data.codes[name];
+                    } catch(err) { console.log(err); }
+                }
+                timeLeft = secondsTillNextInterval();
+            });
+        }
+
+        function secondsTillNextInterval() {
+            return 30 - (Math.floor(new Date().getTime() / 1000) % 30);
+        }
+
+        let timeLeft = secondsTillNextInterval();
+
+        setInterval(() => {
+            updateClock();
+            timeLeft--;
+            for (let name of {{ tokens_keys|tojson }}) {
+                const progressBar = document.getElementById(name + '-progress');
+                if (progressBar) {
+                    progressBar.value = timeLeft;
+                    progressBar.classList.toggle('red', timeLeft < 10);
+                }
+            }
+            if (timeLeft <= 0) {
+                fetchNewCodes();
+                timeLeft = 30;
+            }
+        }, 1000);
+    </script>
+
+    <a href="{{ url_for('register') }}" class="btn btn-dark">Registrar Novo Token</a>
+</body>
+</html>

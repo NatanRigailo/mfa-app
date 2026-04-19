@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Registrar Novo Token</h2>
+    <details>
+        <summary>Precisa de ajuda?</summary>
+        <div class="help-content">
+            <p><strong>Instruções:</strong> Ao adicionar um token MFA, você seguirá o fluxo de cadastro como se fosse cadastrar esse token em um aplicativo de terceiros, através de chave secreta ou QR code.</p>
+            <p><strong>Nome:</strong> Insira um nome que identifique o token (ex: <em>Cliente - Serviço - Conta</em>).</p>
+            <p><strong>Secret:</strong> Alguns fluxos oferecem a opção de exibir a chave secreta para copiar, em vez de escanear o QR code. É o método mais confiável.</p>
+            <p><strong>QR Code:</strong> Tire um print do QR code e faça o upload.</p>
+            <p><strong>ATENÇÃO: não utilize Secret e QR Code juntos. Escolha um ou outro.</strong></p>
+        </div>
+    </details>
+    <form action="{{ url_for('register') }}" method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="name">Nome:</label>
+            <input type="text" class="form-control" id="name" name="name" required>
+        </div>
+        <div class="form-group">
+            <label for="secret">Secret (chave Base32):</label>
+            <input type="text" class="form-control" id="secret" name="secret">
+        </div>
+        <div class="form-group">
+            <label for="qr_code">Ou faça upload do QR Code:</label>
+            <input type="file" class="form-control" id="qr_code" name="qr_code">
+        </div>
+        <button type="submit" class="btn btn-dark">Registrar</button>
+    </form>
+</div>
+{% endblock %}

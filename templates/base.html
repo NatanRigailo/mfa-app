@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #181818;
+            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            padding: 20px;
+        }
+        .token-box {
+            border: 1px solid #444;
+            background-color: #202020;
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .token-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        progress { width: 100%; }
+        progress::-webkit-progress-bar { background-color: #444; }
+        progress::-webkit-progress-value { background-color: #4CAF50; }
+        progress::-moz-progress-bar { background-color: #4CAF50; }
+        details > summary { cursor: pointer; color: blue; }
+        details > .help-content {
+            margin-top: 10px;
+            padding: 5px;
+            background-color: #202020;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-5">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>
