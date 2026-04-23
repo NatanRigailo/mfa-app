@@ -13,7 +13,7 @@ docker run -d \
   -p 5000:5000 \
   -v mfa_data:/data \
   -e EDIT_PASS=suasenha \
-  ghcr.io/sua-org/mfa-tokens:latest
+  ghcr.io/natanrigailo/mfa-app:latest
 ```
 
 Acesse `http://localhost:5000`.
@@ -90,7 +90,7 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 - [x] **Lint** — `flake8` / `ruff` no push e em PRs
 - [x] **SAST** — análise estática com `bandit` (Python) e `semgrep`
-- [ ] **Release** — build e push de imagem Docker com tag semântica (`v1.2.3`) gerada automaticamente via `release-please` ou similar — **pendente: definir registry always-free (GHCR, Docker Hub free tier, etc.) dado budget zero**
+- [x] **Release** — build e push automático no GHCR (`ghcr.io/natanrigailo/mfa-app`) ao criar tag `v*`
 - [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero — **bloqueado pelo Release**
 
 ### Segurança
