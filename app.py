@@ -18,18 +18,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-APP_NAME      = os.getenv("APP_NAME", "MFA Tokens")
-TABLE_NAME    = os.getenv("TABLE_NAME", "mfa_tokens")
-EDIT_PASS     = os.getenv("EDIT_PASS", "")
+APP_NAME = os.getenv("APP_NAME", "MFA Tokens")
+TABLE_NAME = os.getenv("TABLE_NAME", "mfa_tokens")
+EDIT_PASS = os.getenv("EDIT_PASS", "")
 REGISTER_ABLE = os.getenv("REGISTER_ABLE", "true").lower() == "true"
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "5"))
 
 db_host = os.getenv("DB_HOST")
 if db_host:
-    db_user     = os.getenv("DB_USER")
+    db_user = os.getenv("DB_USER")
     db_password = urllib.parse.quote_plus(os.getenv("DB_PASSWORD", ""))
-    db_name     = os.getenv("DB_DATABASE")
-    db_url      = f"mysql+mysqlconnector://{db_user}:{db_password}@{db_host}/{db_name}"
+    db_name = os.getenv("DB_DATABASE")
+    db_url = f"mysql+mysqlconnector://{db_user}:{db_password}@{db_host}/{db_name}"
     logger.info(f"Using MySQL: {db_host}/{db_name}")
 else:
     db_url = "sqlite:////data/tokens.db"
@@ -45,10 +45,10 @@ db = SQLAlchemy(app)
 
 class MfaToken(db.Model):
     __tablename__ = TABLE_NAME
-    id     = db.Column(db.Integer, primary_key=True)
-    name   = db.Column(db.String(80), unique=True, nullable=False)
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), unique=True, nullable=False)
     secret = db.Column(db.String(80), unique=True, nullable=False)
-    ativo  = db.Column(db.Boolean, default=True, nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
 
 
 def get_csrf_token() -> str:
@@ -119,14 +119,14 @@ def index():
         tokens_query = [t for t in tokens_query if t.ativo]
 
     grouped_tokens = {k: list(g) for k, g in groupby(tokens_query, key=lambda x: x.name[0].upper())}
-    tokens_keys    = [t.name for t in tokens_query]
+    tokens_keys = [t.name for t in tokens_query]
 
     return render_template("index.html", grouped_tokens=grouped_tokens, tokens_keys=tokens_keys, edit_mode=edit_mode)
 
 
 @app.route("/get_new_codes")
 def get_new_codes():
-    tokens = db.session.execute(select(MfaToken).where(MfaToken.ativo == True)).scalars().all()
+    tokens = db.session.execute(select(MfaToken).where(MfaToken.ativo.is_(True))).scalars().all()
     codes = {}
     for token in tokens:
         try:
@@ -204,9 +204,9 @@ def register():
             flash("Token de segurança inválido.", "error")
             return redirect(url_for("register"))
 
-        name        = request.form.get("name", "").strip()
+        name = request.form.get("name", "").strip()
         secret_form = request.form.get("secret", "").strip()
-        secret      = None
+        secret = None
 
         if secret_form:
             secret = sanitize_secret(secret_form)
