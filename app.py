@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify, request, flash, redirect, session, url_for
 import urllib.parse
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text, select
+from sqlalchemy import text, select, func
 import pyotp
 import os
 import hmac
@@ -23,6 +23,22 @@ TABLE_NAME = os.getenv("TABLE_NAME", "mfa_tokens")
 EDIT_PASS = os.getenv("EDIT_PASS", "")
 REGISTER_ABLE = os.getenv("REGISTER_ABLE", "true").lower() == "true"
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "5"))
+DEMO_MODE     = os.getenv("DEMO_MODE", "false").lower() == "true"
+
+DEMO_TOKENS = [
+    "AWS – Produção",
+    "AWS – Staging",
+    "GitHub",
+    "Google Workspace",
+    "Cloudflare",
+    "Datadog",
+    "Grafana",
+    "Terraform Cloud",
+    "Slack",
+    "Linear",
+    "Vercel",
+    "PagerDuty",
+]
 
 db_host = os.getenv("DB_HOST")
 if db_host:
@@ -266,9 +282,20 @@ def health_check():
         return str(e), 500
 
 
+def seed_demo():
+    count = db.session.execute(select(func.count()).select_from(MfaToken)).scalar()
+    if count == 0:
+        for name in DEMO_TOKENS:
+            db.session.add(MfaToken(name=name, secret=pyotp.random_base32(), ativo=True))
+        db.session.commit()
+        logger.info(f"Demo: seeded {len(DEMO_TOKENS)} tokens")
+
+
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        if DEMO_MODE:
+            seed_demo()
     from waitress import serve
     port = int(os.getenv("PORT", 5000))
     serve(app, host="0.0.0.0", port=port)  # nosec B104
