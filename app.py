@@ -23,7 +23,7 @@ TABLE_NAME = os.getenv("TABLE_NAME", "mfa_tokens")
 EDIT_PASS = os.getenv("EDIT_PASS", "")
 REGISTER_ABLE = os.getenv("REGISTER_ABLE", "true").lower() == "true"
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "5"))
-DEMO_MODE     = os.getenv("DEMO_MODE", "false").lower() == "true"
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
 
 DEMO_TOKENS = [
     "AWS – Produção",
