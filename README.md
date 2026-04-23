@@ -40,6 +40,7 @@ Para usar MySQL, descomente o bloco `db` no `docker-compose.yml` e defina as var
 | `EDIT_PASS`     | *(vazio)*     | Senha para ativar o modo de edição                         |
 | `REGISTER_ABLE` | `true`        | Habilita o cadastro de novos tokens                        |
 | `TABLE_NAME`    | `mfa_tokens`  | Nome da tabela no banco de dados                           |
+| `MAX_UPLOAD_MB` | `5`           | Tamanho máximo do upload de QR code em MB                  |
 | `LOG_LEVEL`     | `INFO`        | Nível de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`)         |
 | `DB_HOST`       | —             | Host MySQL — se ausente, usa SQLite em `/data/tokens.db`   |
 | `DB_USER`       | —             | Usuário MySQL                                              |
@@ -62,7 +63,7 @@ Acesse `/register` com `REGISTER_ABLE=true`. Aceita chave Base32 digitada ou upl
 
 ### Modo de edição
 
-Clique no ícone de lápis (canto superior direito) e informe o `EDIT_PASS`. No modo de edição é possível renomear tokens e ativar/desativar.
+Clique no ícone de lápis (canto inferior direito) e informe o `EDIT_PASS`. No modo de edição é possível renomear tokens, ativar/desativar e remover.
 
 ---
 
@@ -87,10 +88,10 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 ### Pipeline CI/CD (GitHub Actions)
 
-- [ ] **Lint** — `flake8` / `ruff` no push e em PRs
-- [ ] **SAST** — análise estática com `bandit` (Python) e `semgrep`
-- [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero
-- [ ] **Release** — build e push de imagem Docker para GHCR com tag semântica (`v1.2.3`) gerada automaticamente via `release-please` ou similar
+- [x] **Lint** — `flake8` / `ruff` no push e em PRs
+- [x] **SAST** — análise estática com `bandit` (Python) e `semgrep`
+- [ ] **Release** — build e push de imagem Docker com tag semântica (`v1.2.3`) gerada automaticamente via `release-please` ou similar — **pendente: definir registry always-free (GHCR, Docker Hub free tier, etc.) dado budget zero**
+- [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero — **bloqueado pelo Release**
 
 ### Segurança
 
@@ -100,7 +101,7 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 ### Funcionalidades
 
-- [ ] Exclusão de tokens (hoje só desativação)
+- [x] Exclusão de tokens
 - [ ] Suporte a migrações de schema com Alembic (evitar perda silenciosa em atualizações)
 - [ ] Export / import de tokens (backup criptografado)
 

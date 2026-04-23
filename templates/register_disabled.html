@@ -1,7 +1,39 @@
 {% extends 'base.html' %}
 
+{% block nav_actions %}
+<a href="{{ url_for('index') }}" class="btn">
+    <i class="ph ph-arrow-left"></i> Voltar
+</a>
+{% endblock %}
+
+{% block extra_styles %}
+.disabled-wrap {
+    max-width: 480px;
+    margin: 48px auto;
+    text-align: center;
+}
+
+.disabled-wrap .icon {
+    font-size: 48px;
+    color: var(--muted);
+    margin-bottom: 16px;
+}
+
+.disabled-wrap h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.disabled-wrap p {
+    color: var(--muted);
+    font-size: 14px;
+}
+{% endblock %}
+
 {% block content %}
-<div class="container">
+<div class="disabled-wrap">
+    <div class="icon"><i class="ph ph-lock"></i></div>
     <h2>Registro Desativado</h2>
     <p>O registro de novos tokens está temporariamente desativado. Por favor, tente novamente mais tarde.</p>
 </div>

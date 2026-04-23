@@ -5,53 +5,248 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ app_name }}</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
     <style>
+        :root {
+            --bg:         #0d0d0d;
+            --surface:    #161616;
+            --surface-2:  #1e1e1e;
+            --border:     #2a2a2a;
+            --border-2:   #3a3a3a;
+            --text:       #f2f2f2;
+            --muted:      #888;
+            --accent:     #4ade80;
+            --accent-dim: rgba(74, 222, 128, 0.12);
+            --danger:     #f87171;
+            --radius:     10px;
+            --radius-sm:  6px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            background-color: #181818;
-            color: #e0e0e0;
-            font-family: Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            min-height: 100vh;
         }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 10px;
-            padding: 20px;
+
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            height: 52px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
         }
-        .token-box {
-            border: 1px solid #444;
-            background-color: #202020;
-            padding: 10px;
-            text-align: center;
-            border-radius: 5px;
+
+        .nav-brand {
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: -0.01em;
+            color: var(--text);
         }
-        .token-name {
-            font-weight: bold;
-            margin-bottom: 10px;
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
-        progress { width: 100%; }
-        progress::-webkit-progress-bar { background-color: #444; }
-        progress::-webkit-progress-value { background-color: #4CAF50; }
-        progress::-moz-progress-bar { background-color: #4CAF50; }
-        details > summary { cursor: pointer; color: blue; }
-        details > .help-content {
-            margin-top: 10px;
-            padding: 5px;
-            background-color: #202020;
-            border: 1px solid #ddd;
+
+        #clock {
+            font-variant-numeric: tabular-nums;
+            font-size: 13px;
+            color: var(--muted);
         }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            border: 1px solid var(--border);
+            background: var(--surface-2);
+            color: var(--text);
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn:hover {
+            background: #2a2a2a;
+            border-color: var(--border-2);
+        }
+
+        .btn-accent {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #0d0d0d;
+        }
+
+        .btn-accent:hover {
+            background: #22c55e;
+            border-color: #22c55e;
+            color: #0d0d0d;
+        }
+
+        main {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .flash {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 16px;
+            font-size: 13px;
+            border: 1px solid;
+        }
+
+        .flash.success {
+            background: rgba(74, 222, 128, 0.08);
+            border-color: rgba(74, 222, 128, 0.25);
+            color: var(--accent);
+        }
+
+        .flash.danger, .flash.error {
+            background: rgba(248, 113, 113, 0.08);
+            border-color: rgba(248, 113, 113, 0.25);
+            color: var(--danger);
+        }
+
+        .flash.warning {
+            background: rgba(251, 191, 36, 0.08);
+            border-color: rgba(251, 191, 36, 0.25);
+            color: #fbbf24;
+        }
+
+        .flash.info {
+            background: rgba(96, 165, 250, 0.08);
+            border-color: rgba(96, 165, 250, 0.25);
+            color: #60a5fa;
+        }
+
+        .form-group { margin-bottom: 16px; }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 9px 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        input[type="text"]:focus { border-color: var(--accent); }
+        input[type="text"]::placeholder { color: var(--muted); }
+
+        input[type="file"] {
+            padding: 6px 12px;
+            color: var(--muted);
+            cursor: pointer;
+        }
+
+        details { margin-bottom: 20px; }
+
+        details > summary {
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 13px;
+            user-select: none;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 0;
+        }
+
+        details > summary:hover { color: var(--text); }
+        details > summary::before { content: '›'; font-size: 16px; transition: transform 0.2s; }
+        details[open] > summary::before { transform: rotate(90deg); }
+
+        .help-content {
+            margin-top: 8px;
+            padding: 14px 16px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.7;
+        }
+
+        .help-content p { margin-bottom: 8px; }
+        .help-content p:last-child { margin-bottom: 0; }
+        .help-content strong { color: var(--text); }
+
+        {% block extra_styles %}{% endblock %}
     </style>
 </head>
 <body>
-<div class="container mt-5">
+<nav>
+    <span class="nav-brand">{{ app_name }}</span>
+    <div class="nav-right">
+        <span id="clock"></span>
+        {% block nav_actions %}
+        <a href="{{ url_for('register') }}" class="btn">
+            <i class="ph ph-plus"></i> Registrar
+        </a>
+        {% endblock %}
+    </div>
+</nav>
+<main>
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
-                <div class="alert alert-{{ category }}">{{ message }}</div>
+                <div class="flash {{ category }}">{{ message }}</div>
             {% endfor %}
         {% endif %}
     {% endwith %}
     {% block content %}{% endblock %}
-</div>
+</main>
+<script>
+    function updateClock() {
+        const now = new Date();
+        const pad = n => String(n).padStart(2, '0');
+        const el = document.getElementById('clock');
+        if (el) el.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>
