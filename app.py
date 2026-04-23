@@ -58,7 +58,7 @@ def get_csrf_token() -> str:
 
 
 def validate_csrf() -> bool:
-    token    = request.form.get("csrf_token", "")
+    token = request.form.get("csrf_token", "")
     expected = session.get("csrf_token", "")
     if not token or not expected:
         return False
@@ -100,7 +100,7 @@ def index():
             if duplicate:
                 flash(f"Nome '{new_name}' já está em uso.", "error")
                 return redirect(url_for("index"))
-            token.name  = new_name
+            token.name = new_name
             token.ativo = new_ativo
 
         try:
