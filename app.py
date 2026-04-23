@@ -18,14 +18,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── Config ────────────────────────────────────────────────────────────────────
 APP_NAME      = os.getenv("APP_NAME", "MFA Tokens")
 TABLE_NAME    = os.getenv("TABLE_NAME", "mfa_tokens")
 EDIT_PASS     = os.getenv("EDIT_PASS", "")
 REGISTER_ABLE = os.getenv("REGISTER_ABLE", "true").lower() == "true"
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "5"))
 
-# ── Database ──────────────────────────────────────────────────────────────────
 db_host = os.getenv("DB_HOST")
 if db_host:
     db_user     = os.getenv("DB_USER")
@@ -37,7 +35,6 @@ else:
     db_url = "sqlite:////data/tokens.db"
     logger.info("Using SQLite: /data/tokens.db")
 
-# ── App ───────────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or os.urandom(24).hex()
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url
@@ -54,7 +51,6 @@ class MfaToken(db.Model):
     ativo  = db.Column(db.Boolean, default=True, nullable=False)
 
 
-# ── CSRF ──────────────────────────────────────────────────────────────────────
 def get_csrf_token() -> str:
     if "csrf_token" not in session:
         session["csrf_token"] = secrets.token_hex(32)
@@ -69,7 +65,6 @@ def validate_csrf() -> bool:
     return hmac.compare_digest(token, expected)
 
 
-# ── Globals ───────────────────────────────────────────────────────────────────
 @app.context_processor
 def inject_globals():
     return {"app_name": APP_NAME, "csrf_token": get_csrf_token}
@@ -81,7 +76,6 @@ def log_request():
         logger.debug(f"{request.method} {request.path}")
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
 @app.route("/", methods=["GET", "POST"])
 def index():
     edit_mode = session.get("edit_mode", False)
@@ -183,7 +177,6 @@ def delete_token(token_id):
     return redirect(url_for("index"))
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
 def sanitize_secret(secret: str) -> str | None:
     cleaned = secret.replace(" ", "").upper()
     try:
