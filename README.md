@@ -4,6 +4,18 @@ Aplicação web para armazenamento e consulta centralizada de tokens TOTP compar
 
 Funciona out-of-the-box com SQLite. MySQL é opcional.
 
+**Demo:** [mfa.natan.tec.br](https://mfa.natan.tec.br)
+
+---
+
+## Demo
+
+A instância de demonstração roda em [mfa.natan.tec.br](https://mfa.natan.tec.br) com dados fictícios pré-carregados (`DEMO_MODE=true`).
+
+> **Atenção:** o demo usa o free tier do Render — dorme após 15 minutos sem acesso (cold start de ~30s) e o banco de dados reseta a cada redeploy. Não armazene tokens reais nessa instância.
+
+Para ativar o modo demo na sua própria instância, defina `DEMO_MODE=true`. Na primeira inicialização com banco vazio, a aplicação carrega automaticamente um conjunto de tokens fictícios com nomes realistas e códigos TOTP funcionais.
+
 ---
 
 ## Quick start
@@ -41,6 +53,7 @@ Para usar MySQL, descomente o bloco `db` no `docker-compose.yml` e defina as var
 | `REGISTER_ABLE` | `true`        | Habilita o cadastro de novos tokens                        |
 | `TABLE_NAME`    | `mfa_tokens`  | Nome da tabela no banco de dados                           |
 | `MAX_UPLOAD_MB` | `5`           | Tamanho máximo do upload de QR code em MB                  |
+| `DEMO_MODE`     | `false`       | Semeia tokens fictícios na primeira inicialização com banco vazio |
 | `LOG_LEVEL`     | `INFO`        | Nível de log (`DEBUG`, `INFO`, `WARNING`, `ERROR`)         |
 | `DB_HOST`       | —             | Host MySQL — se ausente, usa SQLite em `/data/tokens.db`   |
 | `DB_USER`       | —             | Usuário MySQL                                              |
