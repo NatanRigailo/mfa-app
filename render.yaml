@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: mfa-app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: APP_NAME
+        value: MFA Tokens
+      - key: REGISTER_ABLE
+        value: "true"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: EDIT_PASS
+        sync: false
