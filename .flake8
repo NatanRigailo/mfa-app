@@ -1,0 +1,10 @@
+[flake8]
+max-line-length = 120
+exclude =
+    .git,
+    __pycache__,
+    venv,
+    migrations
+# E128/E122: indentação de continuação — estilo subjetivo
+# W503/W504: quebra de linha antes/depois de operador binário — conflitam entre si
+ignore = E128, E122, W503, W504
