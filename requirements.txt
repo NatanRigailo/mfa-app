@@ -2,6 +2,7 @@ Flask
 pyotp
 SQLAlchemy
 Flask-SQLAlchemy
+Flask-Migrate
 pyzbar
 Pillow
 waitress

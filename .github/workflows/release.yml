@@ -76,6 +76,17 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          body: |
+            ## Docker
+
+            ```bash
+            docker pull ghcr.io/natanrigailo/mfa-app:${{ github.ref_name }}
+            ```
+
+            | Tag | Imagem |
+            |-----|--------|
+            | versão exata | `ghcr.io/natanrigailo/mfa-app:${{ github.ref_name }}` |
+            | latest | `ghcr.io/natanrigailo/mfa-app:latest` |
 
   deploy:
     runs-on: ubuntu-latest

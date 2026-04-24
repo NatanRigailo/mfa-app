@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+ENV FLASK_APP=app.py
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir mysql-connector-python
@@ -13,9 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt \
 COPY app.py .
 COPY templates/ templates/
 COPY static/ static/
+COPY migrations/ migrations/
 
 VOLUME ["/data"]
 
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["sh", "-c", "flask db upgrade && python app.py"]

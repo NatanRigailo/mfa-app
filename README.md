@@ -101,10 +101,16 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 ### Pipeline CI/CD (GitHub Actions)
 
-- [x] **Lint** — `flake8` / `ruff` no push e em PRs
-- [x] **SAST** — análise estática com `bandit` (Python) e `semgrep`
-- [x] **Release** — build e push automático no GHCR (`ghcr.io/natanrigailo/mfa-app`) ao criar tag `v*`
-- [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero — **bloqueado pelo Release**
+- [x] **Lint** — `flake8` no push e em PRs *(v1.0.0)*
+- [x] **SAST** — análise estática com `bandit` *(v1.0.0)*
+- [x] **Release** — build e push automático no GHCR (`ghcr.io/natanrigailo/mfa-app`) ao criar tag `v*` *(v1.0.0)*
+- [x] **Deploy automático** — webhook para o Render disparado após cada release *(v1.1.0)*
+- [x] **Release notes** — changelog automático via GitHub com imagem Docker nas notas *(v1.1.0)*
+- [ ] **Dependabot** — atualização automática de dependências pip e GitHub Actions
+- [ ] **Container scanning** — Trivy na imagem após o build para detectar CVEs
+- [ ] **SonarCloud** — análise de qualidade, security hotspots e quality gate integrados ao CI (free para repos públicos)
+- [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero
+- [ ] **Badges** — status de CI, Release, GHCR e SonarCloud no topo do README
 
 ### Segurança
 
@@ -114,11 +120,13 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 ### Funcionalidades
 
-- [x] Exclusão de tokens
+- [x] Exclusão de tokens *(v1.0.0)*
+- [x] **Demo mode** — seed de tokens fictícios na primeira inicialização com banco vazio *(v1.1.0)*
 - [ ] Suporte a migrações de schema com Alembic (evitar perda silenciosa em atualizações)
 - [ ] Export / import de tokens (backup criptografado)
 
 ### Qualidade
 
-- [ ] Testes unitários e de integração (`pytest`)
+- [ ] **Testes unitários** — `pytest` + `pytest-flask` cobrindo rotas, lógica TOTP e fluxo de autenticação
+- [ ] **Cobertura** — `pytest-cov` com report no CI e badge via Codecov
 - [ ] Health check verificando conectividade real com o banco

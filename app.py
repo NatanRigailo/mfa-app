@@ -1,13 +1,12 @@
 from flask import Flask, render_template, jsonify, request, flash, redirect, session, url_for
 import urllib.parse
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from sqlalchemy import text, select, func
 import pyotp
 import os
 import hmac
 import secrets
-from pyzbar.pyzbar import decode
-from PIL import Image
 from itertools import groupby
 import logging
 
@@ -41,7 +40,10 @@ DEMO_TOKENS = [
 ]
 
 db_host = os.getenv("DB_HOST")
-if db_host:
+if os.getenv("DATABASE_URL"):
+    db_url = os.getenv("DATABASE_URL")
+    logger.info("Using DATABASE_URL override")
+elif db_host:
     db_user = os.getenv("DB_USER")
     db_password = urllib.parse.quote_plus(os.getenv("DB_PASSWORD", ""))
     db_name = os.getenv("DB_DATABASE")
@@ -57,6 +59,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 db = SQLAlchemy(app)
+migrate = Migrate(app, db, render_as_batch=True)
 
 
 class MfaToken(db.Model):
@@ -234,6 +237,8 @@ def register():
             qr_file = request.files["qr_code"]
             if qr_file.filename:
                 try:
+                    from pyzbar.pyzbar import decode
+                    from PIL import Image
                     decoded_qr = decode(Image.open(qr_file))
                     if not decoded_qr:
                         flash("Não foi possível decodificar o QR Code.", "error")
@@ -293,7 +298,6 @@ def seed_demo():
 
 if __name__ == "__main__":
     with app.app_context():
-        db.create_all()
         if DEMO_MODE:
             seed_demo()
     from waitress import serve
