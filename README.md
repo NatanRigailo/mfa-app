@@ -1,5 +1,9 @@
 # MFA Tokens
 
+[![CI](https://github.com/NatanRigailo/mfa-app/actions/workflows/ci.yml/badge.svg)](https://github.com/NatanRigailo/mfa-app/actions/workflows/ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=NatanRigailo_mfa-app&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=NatanRigailo_mfa-app)
+[![GHCR](https://img.shields.io/github/v/release/NatanRigailo/mfa-app?label=ghcr&logo=docker)](https://github.com/NatanRigailo/mfa-app/pkgs/container/mfa-app)
+
 Aplicação web para armazenamento e consulta centralizada de tokens TOTP compartilhados entre equipes.
 
 Funciona out-of-the-box com SQLite. MySQL é opcional.
