@@ -95,6 +95,23 @@ def log_request():
         logger.debug(f"{request.method} {request.path}")
 
 
+def _apply_token_edits():
+    tokens = db.session.execute(select(MfaToken)).scalars().all()
+    for token in tokens:
+        new_name = request.form.get(f"name_{token.id}", "").strip()
+        if not new_name:
+            continue
+        new_ativo = request.form.get(f"ativo_{token.id}") == "on"
+        duplicate = db.session.execute(
+            select(MfaToken).where(MfaToken.name == new_name, MfaToken.id != token.id)
+        ).scalar()
+        if duplicate:
+            return f"Nome '{new_name}' já está em uso."
+        token.name = new_name
+        token.ativo = new_ativo
+    return None
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     edit_mode = session.get("edit_mode", False)
@@ -107,20 +124,10 @@ def index():
             flash("Token de segurança inválido. Recarregue a página e tente novamente.", "error")
             return redirect(url_for("index"))
 
-        tokens = db.session.execute(select(MfaToken)).scalars().all()
-        for token in tokens:
-            new_name = request.form.get(f"name_{token.id}", "").strip()
-            if not new_name:
-                continue
-            new_ativo = request.form.get(f"ativo_{token.id}") == "on"
-            duplicate = db.session.execute(
-                select(MfaToken).where(MfaToken.name == new_name, MfaToken.id != token.id)
-            ).scalar()
-            if duplicate:
-                flash(f"Nome '{new_name}' já está em uso.", "error")
-                return redirect(url_for("index"))
-            token.name = new_name
-            token.ativo = new_ativo
+        error = _apply_token_edits()
+        if error:
+            flash(error, "error")
+            return redirect(url_for("index"))
 
         try:
             db.session.commit()
