@@ -41,8 +41,48 @@ jobs:
       - name: Run bandit
         run: bandit -r . -ll
 
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build Docker image
+        run: docker build -t mfa-app:ci .
+
+      - name: Save image
+        run: docker save mfa-app:ci | gzip > mfa-app.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: mfa-app.tar.gz
+          retention-days: 1
+
+  scan:
+    runs-on: ubuntu-latest
+    needs: [build]
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load image
+        run: docker load < mfa-app.tar.gz
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: mfa-app:ci
+          format: table
+          exit-code: 1
+          severity: CRITICAL
+
   sonarcloud:
     runs-on: ubuntu-latest
+    needs: [build]
     if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
 
     steps:

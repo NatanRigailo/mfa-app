@@ -71,21 +71,9 @@ jobs:
             | versão exata | `ghcr.io/natanrigailo/mfa-app:${{ needs.tag.outputs.new_tag }}` |
             | latest | `ghcr.io/natanrigailo/mfa-app:latest` |
 
-  scan:
-    runs-on: ubuntu-latest
-    needs: [tag, release]
-    steps:
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.30.0
-        with:
-          image-ref: ghcr.io/natanrigailo/mfa-app:${{ needs.tag.outputs.new_tag }}
-          format: table
-          exit-code: 1
-          severity: CRITICAL
-
   deploy:
     runs-on: ubuntu-latest
-    needs: [scan]
+    needs: [release]
     steps:
       - name: Deploy to Render
         env:
