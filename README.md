@@ -132,5 +132,7 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 ### Qualidade
 
 - [ ] **Testes unitários** — `pytest` + `pytest-flask` cobrindo rotas, lógica TOTP e fluxo de autenticação
+  - Suite rápida como pre-push hook (feedback imediato antes do push)
+  - Suite completa no CI durante o PR, aproveitando a imagem do job `build`
 - [ ] **Cobertura** — `pytest-cov` com report no CI e badge via Codecov
 - [ ] Health check verificando conectividade real com o banco
