@@ -107,14 +107,14 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 - [x] **Lint** — `flake8` no push e em PRs *(v1.0.0)*
 - [x] **SAST** — análise estática com `bandit` *(v1.0.0)*
-- [x] **Release** — build e push automático no GHCR (`ghcr.io/natanrigailo/mfa-app`) ao criar tag `v*` *(v1.0.0)*
+- [x] **Release** — auto-tag semver no merge para `main`, build e push automático no GHCR *(v1.0.0)*
 - [x] **Deploy automático** — webhook para o Render disparado após cada release *(v1.1.0)*
 - [x] **Release notes** — changelog automático via GitHub com imagem Docker nas notas *(v1.1.0)*
-- [ ] **Dependabot** — atualização automática de dependências pip e GitHub Actions
-- [ ] **Container scanning** — Trivy na imagem após o build para detectar CVEs
-- [ ] **SonarCloud** — análise de qualidade, security hotspots e quality gate integrados ao CI (free para repos públicos)
+- [x] **Dependabot** — atualização automática de dependências pip e GitHub Actions *(v1.1.3)*
+- [ ] **Container scanning** — Trivy na imagem no CI para detectar CVEs antes do merge
+- [x] **SonarCloud** — análise de qualidade, security hotspots e quality gate integrados ao CI *(v1.1.2)*
 - [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero
-- [ ] **Badges** — status de CI, Release, GHCR e SonarCloud no topo do README
+- [x] **Badges** — status de CI, SonarCloud e GHCR no topo do README *(v1.1.4)*
 
 ### Segurança
 
