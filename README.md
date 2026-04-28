@@ -122,7 +122,7 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 - [x] Exclusão de tokens *(v1.0.0)*
 - [x] **Demo mode** — seed de tokens fictícios na primeira inicialização com banco vazio *(v1.1.0)*
-- [ ] Suporte a migrações de schema com Alembic (evitar perda silenciosa em atualizações)
+- [x] Suporte a migrações de schema com Alembic (evitar perda silenciosa em atualizações) *(v1.1.1)*
 - [ ] Export / import de tokens (backup criptografado)
 
 ### Qualidade

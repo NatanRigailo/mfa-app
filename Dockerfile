@@ -17,6 +17,9 @@ COPY templates/ templates/
 COPY static/ static/
 COPY migrations/ migrations/
 
+RUN useradd -m appuser && mkdir -p /data && chown appuser:appuser /data
+USER appuser
+
 VOLUME ["/data"]
 
 EXPOSE 5000
