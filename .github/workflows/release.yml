@@ -62,4 +62,6 @@ jobs:
     needs: [release]
     steps:
       - name: Deploy to Render
-        run: curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: curl -fsSL -X POST "$RENDER_DEPLOY_HOOK"
