@@ -74,10 +74,10 @@ func (a *App) healthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := a.db.Ping(); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"status": "error", "db": err.Error()}) //nolint:errcheck // #nosec G104
+		json.NewEncoder(w).Encode(map[string]string{"status": "error", "db": err.Error()}) //nolint:errcheck,gosec
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "db": "ok"}) //nolint:errcheck // #nosec G104
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "db": "ok"}) //nolint:errcheck,gosec
 }
 
 func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +100,7 @@ func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"codes": codes}) //nolint:errcheck // #nosec G104
+	json.NewEncoder(w).Encode(map[string]any{"codes": codes}) //nolint:errcheck,gosec
 }
 
 func (a *App) index(w http.ResponseWriter, r *http.Request) {
@@ -287,7 +287,7 @@ func (a *App) registerPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, a.cfg.MaxUploadMB*1024*1024)
-	if err := r.ParseMultipartForm(a.cfg.MaxUploadMB * 1024 * 1024); err != nil { //nolint:gosec // #nosec G120 -- already bounded by MaxBytesReader above
+	if err := r.ParseMultipartForm(a.cfg.MaxUploadMB * 1024 * 1024); err != nil { //nolint:gosec
 		redirect("/register", "error", "Erro ao processar formulário.")
 		return
 	}

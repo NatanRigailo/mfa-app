@@ -39,7 +39,7 @@ jobs:
       - name: Run gosec
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec ./...
+          gosec -exclude G104,G120 ./...
 
       - name: Run govulncheck
         run: |

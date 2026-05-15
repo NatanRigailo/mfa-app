@@ -52,11 +52,12 @@ func getSession(r *http.Request, key []byte) Session {
 
 func saveSession(w http.ResponseWriter, key []byte, s Session) {
 	data, _ := json.Marshal(s)
-	http.SetCookie(w, &http.Cookie{ //nolint:gosec // #nosec G124 -- Secure omitted intentionally; app supports HTTP deployments
+	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    signMAC(key, data),
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
