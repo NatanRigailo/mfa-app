@@ -57,6 +57,7 @@ func saveSession(w http.ResponseWriter, key []byte, s Session) {
 		Value:    signMAC(key, data),
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 }

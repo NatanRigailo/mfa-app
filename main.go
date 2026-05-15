@@ -113,7 +113,11 @@ func main() {
 		slog.Error("db init failed", "err", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			slog.Error("db close", "err", err)
+		}
+	}()
 
 	if cfg.DemoMode {
 		if err := db.seedDemo(cfg); err != nil {

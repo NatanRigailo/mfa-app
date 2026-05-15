@@ -21,6 +21,8 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
+const registerPath = "/register"
+
 type PageData struct {
 	AppName   string
 	CSRFToken string
@@ -74,10 +76,10 @@ func (a *App) healthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := a.db.Ping(); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]string{"status": "error", "db": err.Error()}) //nolint:errcheck
+		json.NewEncoder(w).Encode(map[string]string{"status": "error", "db": err.Error()}) //nolint:errcheck,gosec
 		return
 	}
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "db": "ok"}) //nolint:errcheck
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "db": "ok"}) //nolint:errcheck,gosec
 }
 
 func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +102,7 @@ func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{"codes": codes}) //nolint:errcheck
+	json.NewEncoder(w).Encode(map[string]any{"codes": codes}) //nolint:errcheck,gosec
 }
 
 func (a *App) index(w http.ResponseWriter, r *http.Request) {
@@ -287,74 +289,74 @@ func (a *App) registerPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, a.cfg.MaxUploadMB*1024*1024)
-	if err := r.ParseMultipartForm(a.cfg.MaxUploadMB * 1024 * 1024); err != nil {
-		redirect("/register", "error", "Erro ao processar formulário.")
+	if err := r.ParseMultipartForm(a.cfg.MaxUploadMB * 1024 * 1024); err != nil { //nolint:gosec
+		redirect(registerPath, "error", "Erro ao processar formulário.")
 		return
 	}
 	if !sess.validCSRF(r.FormValue("csrf_token")) {
-		redirect("/register", "error", "Token de segurança inválido.")
+		redirect(registerPath, "error", "Token de segurança inválido.")
 		return
 	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
-	var secret string
-
-	if raw := strings.TrimSpace(r.FormValue("secret")); raw != "" {
-		if s := sanitizeSecret(raw); s != "" {
-			secret = s
-		} else {
-			redirect("/register", "error", "Secret inválido. Verifique a chave Base32.")
-			return
-		}
-	}
-
-	if secret == "" {
-		if file, _, err := r.FormFile("qr_code"); err == nil {
-			defer file.Close()
-			img, _, err := image.Decode(file)
-			if err != nil {
-				redirect("/register", "error", "Não foi possível decodificar a imagem.")
-				return
-			}
-			uri, err := decodeQR(img)
-			if err != nil {
-				redirect("/register", "error", "Não foi possível decodificar o QR Code.")
-				return
-			}
-			raw := extractSecretFromURI(uri)
-			if raw == "" {
-				redirect("/register", "error", "QR Code não contém um URI otpauth://totp/ válido.")
-				return
-			}
-			if s := sanitizeSecret(raw); s != "" {
-				secret = s
-			} else {
-				redirect("/register", "error", "Secret extraído do QR Code é inválido.")
-				return
-			}
-		}
+	secret, errMsg := resolveSecret(r)
+	if errMsg != "" {
+		redirect(registerPath, "error", errMsg)
+		return
 	}
 
 	if name == "" || secret == "" {
-		redirect("/register", "error", "Nome e secret são obrigatórios.")
+		redirect(registerPath, "error", "Nome e secret são obrigatórios.")
 		return
 	}
 
 	if existing, err := a.db.tokenByName(name); err != nil {
 		slog.Error("register: db error", "err", err)
-		redirect("/register", "error", "Erro interno.")
+		redirect(registerPath, "error", "Erro interno.")
 		return
 	} else if existing != nil {
-		redirect("/register", "error", fmt.Sprintf("Já existe um token com o nome '%s'.", name))
+		redirect(registerPath, "error", fmt.Sprintf("Já existe um token com o nome '%s'.", name))
 		return
 	}
 
 	if err := a.db.createToken(name, secret); err != nil {
 		slog.Error("register: create error", "name", name, "err", err)
-		redirect("/register", "error", "Erro ao salvar o token.")
+		redirect(registerPath, "error", "Erro ao salvar o token.")
 		return
 	}
 	redirect("/", "success", "Token registrado com sucesso!")
+}
+
+func resolveSecret(r *http.Request) (secret, errMsg string) {
+	if raw := strings.TrimSpace(r.FormValue("secret")); raw != "" {
+		if s := sanitizeSecret(raw); s != "" {
+			return s, ""
+		}
+		return "", "Secret inválido. Verifique a chave Base32."
+	}
+
+	file, _, err := r.FormFile("qr_code")
+	if err != nil {
+		return "", ""
+	}
+	defer file.Close() //nolint:errcheck
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return "", "Não foi possível decodificar a imagem."
+	}
+	uri, err := decodeQR(img)
+	if err != nil {
+		return "", "Não foi possível decodificar o QR Code."
+	}
+	raw := extractSecretFromURI(uri)
+	if raw == "" {
+		return "", "QR Code não contém um URI otpauth://totp/ válido."
+	}
+	if s := sanitizeSecret(raw); s != "" {
+		return s, ""
+	}
+	return "", "Secret extraído do QR Code é inválido."
 }
 
 func sanitizeSecret(secret string) string {
