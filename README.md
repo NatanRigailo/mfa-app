@@ -86,6 +86,8 @@ Clique no ícone de lápis (canto inferior direito) e informe o `EDIT_PASS`. No 
 
 ## Desenvolvimento local
 
+> **v2.0 (Go)** — em desenvolvimento na branch `beta`. As instruções abaixo são válidas para a v1.x (Python/Flask).
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -103,36 +105,50 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 ## Roadmap
 
-### Pipeline CI/CD (GitHub Actions)
+### v1.x — Concluído
 
-- [x] **Lint** — `flake8` no push e em PRs *(v1.0.0)*
-- [x] **SAST** — análise estática com `bandit` *(v1.0.0)*
-- [x] **Release** — auto-tag semver no merge para `main`, build e push automático no GHCR *(v1.0.0)*
-- [x] **Deploy automático** — webhook para o Render disparado após cada release *(v1.1.0)*
-- [x] **Release notes** — changelog automático via GitHub com imagem Docker nas notas *(v1.1.0)*
+**Pipeline CI/CD**
+- [x] **Lint** — `flake8` *(v1.0.0)*
+- [x] **SAST** — `bandit` *(v1.0.0)*
+- [x] **Release** — auto-tag semver, build e push automático no GHCR *(v1.0.0)*
+- [x] **Deploy automático** — webhook para o Render *(v1.1.0)*
+- [x] **Release notes** — changelog automático com imagem Docker nas notas *(v1.1.0)*
 - [x] **Dependabot** — atualização automática de dependências pip e GitHub Actions *(v1.1.3)*
-- [ ] **Container scanning** — Trivy na imagem no CI para detectar CVEs antes do merge
-- [x] **SonarCloud** — análise de qualidade, security hotspots e quality gate integrados ao CI *(v1.1.2)*
-- [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero
-- [x] **Badges** — status de CI, SonarCloud e GHCR no topo do README *(v1.1.4)*
+- [x] **SonarCloud** — quality gate e security hotspots integrados ao CI *(v1.1.2)*
+- [x] **Container scanning** — Trivy (CVEs na imagem) *(v1.1.14)*
+- [x] **Badges** — CI, SonarCloud e GHCR no topo do README *(v1.1.4)*
 
-### Segurança
-
-- [ ] Proteção de força bruta no `toggle_edit` (rate limiting por IP)
-- [ ] Autenticação no endpoint `/get_new_codes` via `API_TOKEN` (atualmente expõe todos os secrets sem auth)
-- [ ] Suporte a HTTPS nativo (via Caddy sidecar ou configuração de certificado)
-
-### Funcionalidades
-
+**Funcionalidades**
 - [x] Exclusão de tokens *(v1.0.0)*
 - [x] **Demo mode** — seed de tokens fictícios na primeira inicialização com banco vazio *(v1.1.0)*
-- [x] Suporte a migrações de schema com Alembic (evitar perda silenciosa em atualizações) *(v1.1.1)*
-- [ ] Export / import de tokens (backup criptografado)
+- [x] Migrações de schema com Alembic *(v1.1.1)*
 
-### Qualidade
+---
 
-- [ ] **Testes unitários** — `pytest` + `pytest-flask` cobrindo rotas, lógica TOTP e fluxo de autenticação
-  - Suite rápida como pre-push hook (feedback imediato antes do push)
-  - Suite completa no CI durante o PR, aproveitando a imagem do job `build`
-- [ ] **Cobertura** — `pytest-cov` com report no CI e badge via Codecov
-- [ ] Health check verificando conectividade real com o banco
+### v2.0 — Em desenvolvimento
+
+**Migração para Go**
+- [ ] Rewrite da aplicação em Go — `net/http`, `go-otp`, `modernc/sqlite` ([#35](https://github.com/NatanRigailo/mfa-app/issues/35))
+- [ ] Dockerfile multi-stage com imagem `scratch`/`distroless` (~15 MB vs ~200 MB atual) ([#36](https://github.com/NatanRigailo/mfa-app/issues/36))
+- [ ] Pipeline adaptado para tooling Go — `golangci-lint`, `gosec`, `govulncheck` ([#37](https://github.com/NatanRigailo/mfa-app/issues/37))
+
+**Pipeline CI/CD**
+- [ ] Trigger unificado em `pull_request`, `permissions: contents: read` e Go module cache ([#26](https://github.com/NatanRigailo/mfa-app/issues/26))
+- [ ] `hadolint` e `actionlint` no job de lint ([#27](https://github.com/NatanRigailo/mfa-app/issues/27))
+- [ ] `gitleaks` para secret scanning ([#29](https://github.com/NatanRigailo/mfa-app/issues/29))
+- [ ] Build refatorado com buildx e GHA layer cache ([#30](https://github.com/NatanRigailo/mfa-app/issues/30))
+- [ ] Trivy estendido para `CRITICAL,HIGH` com `ignore-unfixed` ([#31](https://github.com/NatanRigailo/mfa-app/issues/31))
+- [ ] SonarCloud — action atualizada e permissão de PR comments ([#32](https://github.com/NatanRigailo/mfa-app/issues/32))
+- [ ] **DAST** — scan dinâmico com OWASP ZAP contra container efêmero ([#33](https://github.com/NatanRigailo/mfa-app/issues/33))
+- [ ] Release workflow hardening e otimização ([#34](https://github.com/NatanRigailo/mfa-app/issues/34))
+
+**Segurança**
+- [ ] Rate limiting por IP no `toggle_edit` contra força bruta ([#38](https://github.com/NatanRigailo/mfa-app/issues/38))
+- [ ] Autenticação via `API_TOKEN` no `/get_new_codes` ([#39](https://github.com/NatanRigailo/mfa-app/issues/39))
+
+**Qualidade**
+- [ ] Suite de testes Go com `httptest` e banco in-memory ([#40](https://github.com/NatanRigailo/mfa-app/issues/40))
+- [ ] `/healthz` com verificação real de conectividade ao banco ([#41](https://github.com/NatanRigailo/mfa-app/issues/41))
+
+**Funcionalidades**
+- [ ] Export/import de tokens como backup criptografado (AES-256-GCM) ([#42](https://github.com/NatanRigailo/mfa-app/issues/42))
