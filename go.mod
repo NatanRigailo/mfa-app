@@ -1,6 +1,6 @@
 module github.com/natanrigailo/mfa-app
 
-go 1.23
+go 1.25
 
 require (
 	github.com/go-sql-driver/mysql v1.9.2
