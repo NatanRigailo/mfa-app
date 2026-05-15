@@ -21,6 +21,8 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
+const registerPath = "/register"
+
 type PageData struct {
 	AppName   string
 	CSRFToken string
@@ -288,38 +290,38 @@ func (a *App) registerPost(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, a.cfg.MaxUploadMB*1024*1024)
 	if err := r.ParseMultipartForm(a.cfg.MaxUploadMB * 1024 * 1024); err != nil { //nolint:gosec
-		redirect("/register", "error", "Erro ao processar formulário.")
+		redirect(registerPath, "error", "Erro ao processar formulário.")
 		return
 	}
 	if !sess.validCSRF(r.FormValue("csrf_token")) {
-		redirect("/register", "error", "Token de segurança inválido.")
+		redirect(registerPath, "error", "Token de segurança inválido.")
 		return
 	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
 	secret, errMsg := resolveSecret(r)
 	if errMsg != "" {
-		redirect("/register", "error", errMsg)
+		redirect(registerPath, "error", errMsg)
 		return
 	}
 
 	if name == "" || secret == "" {
-		redirect("/register", "error", "Nome e secret são obrigatórios.")
+		redirect(registerPath, "error", "Nome e secret são obrigatórios.")
 		return
 	}
 
 	if existing, err := a.db.tokenByName(name); err != nil {
 		slog.Error("register: db error", "err", err)
-		redirect("/register", "error", "Erro interno.")
+		redirect(registerPath, "error", "Erro interno.")
 		return
 	} else if existing != nil {
-		redirect("/register", "error", fmt.Sprintf("Já existe um token com o nome '%s'.", name))
+		redirect(registerPath, "error", fmt.Sprintf("Já existe um token com o nome '%s'.", name))
 		return
 	}
 
 	if err := a.db.createToken(name, secret); err != nil {
 		slog.Error("register: create error", "name", name, "err", err)
-		redirect("/register", "error", "Erro ao salvar o token.")
+		redirect(registerPath, "error", "Erro ao salvar o token.")
 		return
 	}
 	redirect("/", "success", "Token registrado com sucesso!")
