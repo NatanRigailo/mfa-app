@@ -41,6 +41,7 @@ jobs:
         with:
           go-version-file: go.mod
           go-package: ./...
+          repo-checkout: false
 
   test:
     name: Test
