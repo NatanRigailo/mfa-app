@@ -297,42 +297,10 @@ func (a *App) registerPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
-	var secret string
-
-	if raw := strings.TrimSpace(r.FormValue("secret")); raw != "" {
-		if s := sanitizeSecret(raw); s != "" {
-			secret = s
-		} else {
-			redirect("/register", "error", "Secret inválido. Verifique a chave Base32.")
-			return
-		}
-	}
-
-	if secret == "" {
-		if file, _, err := r.FormFile("qr_code"); err == nil {
-			defer file.Close() //nolint:errcheck
-			img, _, err := image.Decode(file)
-			if err != nil {
-				redirect("/register", "error", "Não foi possível decodificar a imagem.")
-				return
-			}
-			uri, err := decodeQR(img)
-			if err != nil {
-				redirect("/register", "error", "Não foi possível decodificar o QR Code.")
-				return
-			}
-			raw := extractSecretFromURI(uri)
-			if raw == "" {
-				redirect("/register", "error", "QR Code não contém um URI otpauth://totp/ válido.")
-				return
-			}
-			if s := sanitizeSecret(raw); s != "" {
-				secret = s
-			} else {
-				redirect("/register", "error", "Secret extraído do QR Code é inválido.")
-				return
-			}
-		}
+	secret, errMsg := resolveSecret(r)
+	if errMsg != "" {
+		redirect("/register", "error", errMsg)
+		return
 	}
 
 	if name == "" || secret == "" {
@@ -355,6 +323,38 @@ func (a *App) registerPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirect("/", "success", "Token registrado com sucesso!")
+}
+
+func resolveSecret(r *http.Request) (secret, errMsg string) {
+	if raw := strings.TrimSpace(r.FormValue("secret")); raw != "" {
+		if s := sanitizeSecret(raw); s != "" {
+			return s, ""
+		}
+		return "", "Secret inválido. Verifique a chave Base32."
+	}
+
+	file, _, err := r.FormFile("qr_code")
+	if err != nil {
+		return "", ""
+	}
+	defer file.Close() //nolint:errcheck
+
+	img, _, err := image.Decode(file)
+	if err != nil {
+		return "", "Não foi possível decodificar a imagem."
+	}
+	uri, err := decodeQR(img)
+	if err != nil {
+		return "", "Não foi possível decodificar o QR Code."
+	}
+	raw := extractSecretFromURI(uri)
+	if raw == "" {
+		return "", "QR Code não contém um URI otpauth://totp/ válido."
+	}
+	if s := sanitizeSecret(raw); s != "" {
+		return s, ""
+	}
+	return "", "Secret extraído do QR Code é inválido."
 }
 
 func sanitizeSecret(secret string) string {
