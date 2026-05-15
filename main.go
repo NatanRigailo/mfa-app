@@ -30,6 +30,7 @@ type Config struct {
 	DBPassword   string
 	DBDatabase   string
 	TableName    string
+	SQLitePath   string
 }
 
 func loadConfig() Config {
@@ -61,6 +62,7 @@ func loadConfig() Config {
 		DBPassword:   os.Getenv("DB_PASSWORD"),
 		DBDatabase:   os.Getenv("DB_DATABASE"),
 		TableName:    envOr("TABLE_NAME", "mfa_tokens"),
+		SQLitePath:   envOr("SQLITE_PATH", "/data/tokens.db"),
 	}
 }
 

@@ -4,7 +4,7 @@ IMAGE   := ghcr.io/natanrigailo/mfa-app
 .PHONY: run build lint test up down clean
 
 run: ## Build and run locally (requires Go)
-	go run .
+	SQLITE_PATH=./tokens.db go run .
 
 build: ## Build binary
 	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o $(BINARY) .

@@ -10,17 +10,18 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o mfa-app .
 
 FROM alpine:3.21
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
-    && mkdir -p /data && chown appuser:appgroup /data
+RUN apk add --no-cache su-exec \
+    && addgroup -S appgroup && adduser -S appuser -G appgroup
 
-COPY --from=builder /build/mfa-app  /app/mfa-app
+COPY --from=builder /build/mfa-app   /app/mfa-app
 COPY --from=builder /build/templates /app/templates
 COPY --from=builder /build/static    /app/static
+COPY entrypoint.sh                   /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
-USER appuser
 WORKDIR /app
 
 VOLUME ["/data"]
 EXPOSE 5000
 
-ENTRYPOINT ["/app/mfa-app"]
+ENTRYPOINT ["/app/entrypoint.sh"]

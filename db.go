@@ -47,8 +47,8 @@ func initDB(cfg Config) (*Database, error) {
 		slog.Info("using MySQL", "host", cfg.DBHost, "db", cfg.DBDatabase)
 	} else {
 		driver = "sqlite"
-		dsn = "file:/data/tokens.db?_busy_timeout=5000&_journal_mode=WAL"
-		slog.Info("using SQLite", "path", "/data/tokens.db")
+		dsn = cfg.SQLitePath
+		slog.Info("using SQLite", "path", cfg.SQLitePath)
 	}
 
 	db, err := sql.Open(driver, dsn)
@@ -57,6 +57,15 @@ func initDB(cfg Config) (*Database, error) {
 	}
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("ping db: %w", err)
+	}
+
+	if cfg.DBHost == "" {
+		if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
+			return nil, fmt.Errorf("set journal_mode: %w", err)
+		}
+		if _, err := db.Exec(`PRAGMA busy_timeout=5000`); err != nil {
+			return nil, fmt.Errorf("set busy_timeout: %w", err)
+		}
 	}
 
 	d := &Database{db: db, tableName: cfg.TableName}
