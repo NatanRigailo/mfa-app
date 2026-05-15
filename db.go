@@ -75,7 +75,7 @@ func initDB(cfg Config) (*Database, error) {
 	return d, nil
 }
 
-func (d *Database) Close() { d.db.Close() }
+func (d *Database) Close() error { return d.db.Close() }
 
 func (d *Database) Ping() error { return d.db.Ping() }
 
@@ -107,7 +107,7 @@ func (d *Database) queryTokens(query string, args ...any) ([]Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var tokens []Token
 	for rows.Next() {
