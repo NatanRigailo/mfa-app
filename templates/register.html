@@ -1,50 +1,10 @@
-{% extends 'base.html' %}
-
-{% block nav_actions %}
-<a href="{{ url_for('index') }}" class="btn">
+{{ define "nav_actions" }}
+<a href="/" class="btn">
     <i class="ph ph-arrow-left"></i> Voltar
 </a>
-{% endblock %}
+{{ end }}
 
-{% block extra_styles %}
-.register-wrap {
-    max-width: 520px;
-    margin: 0 auto;
-}
-
-.register-wrap h2 {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 20px;
-    letter-spacing: -0.02em;
-}
-
-.card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 24px;
-}
-
-.divider {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 4px 0 16px;
-    color: var(--muted);
-    font-size: 12px;
-}
-
-.divider::before,
-.divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-}
-{% endblock %}
-
-{% block content %}
+{{ define "content" }}
 <div class="register-wrap">
     <h2>Registrar Novo Token</h2>
 
@@ -60,8 +20,8 @@
     </details>
 
     <div class="card">
-        <form action="{{ url_for('register') }}" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <form action="/register" method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
             <div class="form-group">
                 <label for="name">Nome</label>
                 <input type="text" id="name" name="name" placeholder="Ex: AWS – Produção" required>
@@ -75,10 +35,10 @@
                 <label for="qr_code">Upload do QR Code</label>
                 <input type="file" id="qr_code" name="qr_code" accept="image/*">
             </div>
-            <button type="submit" class="btn btn-accent" style="width: 100%; justify-content: center; padding: 10px 14px; margin-top: 4px;">
+            <button type="submit" class="btn btn-accent" style="width:100%;justify-content:center;padding:10px 14px;margin-top:4px;">
                 <i class="ph ph-shield-check"></i> Registrar Token
             </button>
         </form>
     </div>
 </div>
-{% endblock %}
+{{ end }}
