@@ -22,7 +22,7 @@ func TestSecurityHeaders(t *testing.T) {
 	if got := w.Header().Get("X-Frame-Options"); got != "DENY" {
 		t.Errorf("X-Frame-Options = %q, want DENY", got)
 	}
-	if got := w.Header().Get("Content-Security-Policy"); got == "" {
+	if w.Header().Get("Content-Security-Policy") == "" {
 		t.Error("Content-Security-Policy header not set")
 	}
 }
