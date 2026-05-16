@@ -107,7 +107,24 @@ jobs:
           image-ref: mfa-app:ci
           format: table
           exit-code: 1
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   sonarcloud:
     name: SonarCloud
