@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o mfa-app .
 
 FROM alpine:3.21
 
-RUN apk add --no-cache su-exec \
+RUN apk add --no-cache su-exec=0.2-r3 \
     && addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY --from=builder /build/mfa-app   /app/mfa-app

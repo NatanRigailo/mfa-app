@@ -23,6 +23,14 @@ jobs:
         with:
           version: latest
 
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Run actionlint
+        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
+
   sast:
     name: SAST
     runs-on: ubuntu-latest
