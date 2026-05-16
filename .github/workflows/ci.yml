@@ -30,8 +30,8 @@ jobs:
 
       - name: Run actionlint
         run: |
-          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) 1.7.7
-          ./actionlint
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          actionlint
 
   sast:
     name: SAST
