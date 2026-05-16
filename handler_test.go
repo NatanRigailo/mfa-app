@@ -283,6 +283,50 @@ func TestGetNewCodes_InactiveExcluded(t *testing.T) {
 	}
 }
 
+func TestGetNewCodes_APIToken_NoHeader(t *testing.T) {
+	app := testApp(t)
+	app.cfg.APIToken = "secret-token"
+
+	r := httptest.NewRequest("GET", "/get_new_codes", nil)
+	w := httptest.NewRecorder()
+	app.getNewCodes(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %d", w.Code)
+	}
+}
+
+func TestGetNewCodes_APIToken_WrongToken(t *testing.T) {
+	app := testApp(t)
+	app.cfg.APIToken = "secret-token"
+
+	r := httptest.NewRequest("GET", "/get_new_codes", nil)
+	r.Header.Set("Authorization", "Bearer wrong-token")
+	w := httptest.NewRecorder()
+	app.getNewCodes(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("want 401, got %d", w.Code)
+	}
+}
+
+func TestGetNewCodes_APIToken_ValidToken(t *testing.T) {
+	app := testApp(t)
+	app.cfg.APIToken = "secret-token"
+	if err := app.db.createToken("GitHub", randomBase32Secret()); err != nil {
+		t.Fatalf("seed token: %v", err)
+	}
+
+	r := httptest.NewRequest("GET", "/get_new_codes", nil)
+	r.Header.Set("Authorization", "Bearer secret-token")
+	w := httptest.NewRecorder()
+	app.getNewCodes(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d", w.Code)
+	}
+}
+
 func TestIndex(t *testing.T) {
 	app := testApp(t)
 	r := httptest.NewRequest("GET", "/", nil)
