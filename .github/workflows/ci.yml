@@ -63,7 +63,7 @@ jobs:
         run: |
           pct=$(go tool cover -func=coverage.out | awk '/^total:/{print $3}' | tr -d '%')
           echo "Coverage: ${pct}%"
-          awk -v p="$pct" 'BEGIN{if(p+0 < 60){printf "Coverage %.1f%% is below 60%% threshold\n", p; exit 1}}'
+          awk -v p="$pct" 'BEGIN{if(p+0 < 80){printf "Coverage %.1f%% is below 80%% threshold\n", p; exit 1}}'
 
       - uses: actions/upload-artifact@v7
         with:

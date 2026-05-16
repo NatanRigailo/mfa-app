@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +15,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/boombuler/barcode"
+	"github.com/boombuler/barcode/qr"
 )
 
 // testApp creates an isolated App backed by a temp SQLite database.
@@ -63,6 +69,65 @@ func multipartRequest(t *testing.T, fields map[string]string) *http.Request {
 		if err := mw.WriteField(k, v); err != nil {
 			t.Fatalf("multipart write field %q: %v", k, err)
 		}
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("multipart close: %v", err)
+	}
+	r := httptest.NewRequest("POST", "/register", &buf)
+	r.Header.Set("Content-Type", mw.FormDataContentType())
+	return r
+}
+
+// qrCodePNG generates a PNG-encoded QR code containing content.
+func qrCodePNG(t *testing.T, content string) []byte {
+	t.Helper()
+	code, err := qr.Encode(content, qr.M, qr.Auto)
+	if err != nil {
+		t.Fatalf("qr encode: %v", err)
+	}
+	scaled, err := barcode.Scale(code, 200, 200)
+	if err != nil {
+		t.Fatalf("qr scale: %v", err)
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, scaled); err != nil {
+		t.Fatalf("png encode: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// blankPNG returns a 100x100 white PNG — a valid image but not a QR code.
+func blankPNG(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 100, 100))
+	for x := range 100 {
+		for y := range 100 {
+			img.Set(x, y, color.White)
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("png encode: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// multipartRequestWithFile builds a POST /register request that includes a file upload.
+func multipartRequestWithFile(t *testing.T, fields map[string]string, fileField, filename string, fileData []byte) *http.Request {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	for k, v := range fields {
+		if err := mw.WriteField(k, v); err != nil {
+			t.Fatalf("write field %q: %v", k, err)
+		}
+	}
+	fw, err := mw.CreateFormFile(fileField, filename)
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	if _, err := fw.Write(fileData); err != nil {
+		t.Fatalf("write file data: %v", err)
 	}
 	if err := mw.Close(); err != nil {
 		t.Fatalf("multipart close: %v", err)
@@ -540,6 +605,467 @@ func TestIndexPost_NotInEditMode(t *testing.T) {
 	sess := responseSession(t, app.cfg.SecretKey, w)
 	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
 		t.Fatal("expected error flash when not in edit mode")
+	}
+}
+
+func TestRender_UnknownPage(t *testing.T) {
+	app := testApp(t)
+	w := httptest.NewRecorder()
+	app.render(w, "nonexistent_page", nil)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("want 500, got %d", w.Code)
+	}
+}
+
+func TestHealthz_DBError(t *testing.T) {
+	app := testApp(t)
+	app.db.Close() //nolint:errcheck
+	r := httptest.NewRequest("GET", "/healthz", nil)
+	w := httptest.NewRecorder()
+	app.healthz(w, r)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("want 503, got %d", w.Code)
+	}
+}
+
+func TestIndex_EditMode(t *testing.T) {
+	app := testApp(t)
+	if err := app.db.createToken("GitHub", randomBase32Secret()); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: "token"})
+	r := httptest.NewRequest("GET", "/", nil)
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.index(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d", w.Code)
+	}
+}
+
+func TestRegisterPost_EmptySecretNoFile(t *testing.T) {
+	app := testApp(t)
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	r := multipartRequest(t, map[string]string{
+		"csrf_token": csrf,
+		"name":       "GitHub",
+		// no secret, no qr_code file
+	})
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for missing secret and file")
+	}
+}
+
+func TestIndexPost_NoCSRF(t *testing.T) {
+	app := testApp(t)
+	csrf := "real-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: csrf})
+
+	form := url.Values{"csrf_token": {"wrong"}}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.indexPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected CSRF error flash")
+	}
+}
+
+func TestIndexPost_DuplicateName(t *testing.T) {
+	app := testApp(t)
+	if err := app.db.createToken("GitHub", randomBase32Secret()); err != nil {
+		t.Fatalf("seed GitHub: %v", err)
+	}
+	if err := app.db.createToken("AWS", randomBase32Secret()); err != nil {
+		t.Fatalf("seed AWS: %v", err)
+	}
+	tokens, _ := app.db.allTokens()
+
+	var githubID int64
+	for _, tok := range tokens {
+		if tok.Name == "GitHub" {
+			githubID = tok.ID
+		}
+	}
+
+	csrf := "csrf-token"
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: csrf})
+	form := url.Values{
+		"csrf_token":                     {csrf},
+		fmt.Sprintf("name_%d", githubID): {"AWS"},
+	}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.indexPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for duplicate name")
+	}
+}
+
+func TestDeleteToken_NoCSRF(t *testing.T) {
+	app := testApp(t)
+	if err := app.db.createToken("GitHub", randomBase32Secret()); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	tokens, _ := app.db.allTokens()
+	id := tokens[0].ID
+
+	csrf := "real-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: csrf})
+
+	idStr := strconv.FormatInt(id, 10)
+	form := url.Values{"csrf_token": {"wrong"}}
+	r := httptest.NewRequest("POST", "/delete/"+idStr, strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.SetPathValue("id", idStr)
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.deleteToken(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected CSRF error flash")
+	}
+}
+
+func TestDeleteToken_InvalidID(t *testing.T) {
+	app := testApp(t)
+	csrf := "csrf-token"
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: csrf})
+
+	form := url.Values{"csrf_token": {csrf}}
+	r := httptest.NewRequest("POST", "/delete/notanumber", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.SetPathValue("id", "notanumber")
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.deleteToken(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
+	}
+}
+
+func TestIndex_DBError(t *testing.T) {
+	app := testApp(t)
+	app.db.Close() //nolint:errcheck
+	r := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	app.index(w, r)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("want 500, got %d", w.Code)
+	}
+}
+
+func TestGetNewCodes_DBError(t *testing.T) {
+	app := testApp(t)
+	app.db.Close() //nolint:errcheck
+	r := httptest.NewRequest("GET", "/get_new_codes", nil)
+	w := httptest.NewRecorder()
+	app.getNewCodes(w, r)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("want 500, got %d", w.Code)
+	}
+}
+
+func TestGetNewCodes_TOTPError(t *testing.T) {
+	app := testApp(t)
+	// bypass sanitizeSecret by inserting directly with an invalid secret
+	if err := app.db.createToken("BadToken", "NOT!VALID!BASE32"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	r := httptest.NewRequest("GET", "/get_new_codes", nil)
+	w := httptest.NewRecorder()
+	app.getNewCodes(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d", w.Code)
+	}
+	var body struct {
+		Codes map[string]string `json:"codes"`
+	}
+	json.NewDecoder(w.Body).Decode(&body) //nolint:errcheck
+	if _, ok := body.Codes["BadToken"]; ok {
+		t.Fatal("token with invalid secret should be skipped in output")
+	}
+}
+
+func TestRegisterPost_BodyTooLarge(t *testing.T) {
+	app := testApp(t)
+	app.cfg.MaxUploadMB = 0 // 0-byte limit → any body triggers error
+
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	r := multipartRequest(t, map[string]string{"csrf_token": csrf, "name": "x"})
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for body too large")
+	}
+}
+
+func TestRegisterPost_InvalidImageFile(t *testing.T) {
+	app := testApp(t)
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if err := mw.WriteField("csrf_token", csrf); err != nil {
+		t.Fatalf("write field: %v", err)
+	}
+	if err := mw.WriteField("name", "GitHub"); err != nil {
+		t.Fatalf("write field: %v", err)
+	}
+	fw, err := mw.CreateFormFile("qr_code", "fake.png")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	fw.Write([]byte("this is not a valid image")) //nolint:errcheck
+	mw.Close()                                    //nolint:errcheck
+
+	r := httptest.NewRequest("POST", "/register", &buf)
+	r.Header.Set("Content-Type", mw.FormDataContentType())
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for invalid image file")
+	}
+}
+
+func TestIndexPost_SkipEmptyName(t *testing.T) {
+	app := testApp(t)
+	if err := app.db.createToken("AWS", randomBase32Secret()); err != nil {
+		t.Fatalf("seed AWS: %v", err)
+	}
+	if err := app.db.createToken("GitHub", randomBase32Secret()); err != nil {
+		t.Fatalf("seed GitHub: %v", err)
+	}
+	tokens, _ := app.db.allTokens() // ordered by name: AWS(0), GitHub(1)
+
+	csrf := "csrf-token"
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: csrf})
+
+	// only provide a name for GitHub — AWS gets empty name and is skipped
+	form := url.Values{
+		"csrf_token":                     {csrf},
+		fmt.Sprintf("name_%d", tokens[1].ID): {"GitHub"},
+	}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.indexPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "success" {
+		t.Fatalf("expected success flash, got %+v", sess.Flashes)
+	}
+}
+
+func TestRegisterPost_ValidQRCode(t *testing.T) {
+	app := testApp(t)
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	uri := "otpauth://totp/Test?secret=JBSWY3DPEHPK3PXP"
+	r := multipartRequestWithFile(t,
+		map[string]string{"csrf_token": csrf, "name": "QRToken"},
+		"qr_code", "test.png", qrCodePNG(t, uri),
+	)
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	if w.Header().Get("Location") != "/" {
+		t.Fatalf("want redirect to /, got %q", w.Header().Get("Location"))
+	}
+}
+
+func TestRegisterPost_QRCodeWrongScheme(t *testing.T) {
+	app := testApp(t)
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	// QR code contains a URL that is not an otpauth://totp/ URI
+	r := multipartRequestWithFile(t,
+		map[string]string{"csrf_token": csrf, "name": "QRToken"},
+		"qr_code", "test.png", qrCodePNG(t, "https://example.com"),
+	)
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for wrong QR scheme")
+	}
+}
+
+func TestRegisterPost_QRCodeInvalidSecret(t *testing.T) {
+	app := testApp(t)
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	// QR code is valid otpauth but secret is not valid base32
+	uri := "otpauth://totp/Test?secret=NOTVALIDBASE32!!!!"
+	r := multipartRequestWithFile(t,
+		map[string]string{"csrf_token": csrf, "name": "QRToken"},
+		"qr_code", "test.png", qrCodePNG(t, uri),
+	)
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for invalid QR secret")
+	}
+}
+
+func TestRegisterPost_NotAQRCode(t *testing.T) {
+	app := testApp(t)
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	// valid PNG image but does not contain a QR code
+	r := multipartRequestWithFile(t,
+		map[string]string{"csrf_token": csrf, "name": "QRToken"},
+		"qr_code", "blank.png", blankPNG(t),
+	)
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for image without QR code")
+	}
+}
+
+func TestIndexPost_DBError(t *testing.T) {
+	app := testApp(t)
+	csrf := "csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: csrf})
+	app.db.Close() //nolint:errcheck
+
+	form := url.Values{"csrf_token": {csrf}}
+	r := httptest.NewRequest("POST", "/", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.AddCookie(cookie)
+	w := httptest.NewRecorder()
+	app.indexPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for DB error")
+	}
+}
+
+func TestDeleteToken_DBError(t *testing.T) {
+	app := testApp(t)
+	csrf := "csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{EditMode: true, CSRFToken: csrf})
+
+	form := url.Values{"csrf_token": {csrf}}
+	r := httptest.NewRequest("POST", "/delete/1", strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	r.SetPathValue("id", "1")
+	r.AddCookie(cookie)
+	app.db.Close() //nolint:errcheck
+
+	w := httptest.NewRecorder()
+	app.deleteToken(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for DB error")
+	}
+}
+
+func TestRegisterPost_DBError(t *testing.T) {
+	app := testApp(t)
+	csrf := "test-csrf"
+	cookie := signedCookie(app.cfg.SecretKey, Session{CSRFToken: csrf})
+
+	r := multipartRequest(t, map[string]string{
+		"csrf_token": csrf,
+		"name":       "GitHub",
+		"secret":     randomBase32Secret(),
+	})
+	r.AddCookie(cookie)
+	app.db.Close() //nolint:errcheck
+
+	w := httptest.NewRecorder()
+	app.registerPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	sess := responseSession(t, app.cfg.SecretKey, w)
+	if len(sess.Flashes) == 0 || sess.Flashes[0].Category != "error" {
+		t.Fatal("expected error flash for DB error")
 	}
 }
 

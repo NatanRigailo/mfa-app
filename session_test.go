@@ -127,3 +127,21 @@ func TestGetSession_TamperedCookie(t *testing.T) {
 		t.Fatal("tampered cookie should yield a fresh session")
 	}
 }
+
+func TestGetSession_EmptyCSRFInSession(t *testing.T) {
+	key := []byte("test-key")
+	// valid session but CSRFToken is empty — should be regenerated
+	sess := Session{EditMode: true}
+	data, _ := json.Marshal(sess)
+
+	r, _ := http.NewRequest("GET", "/", nil)
+	r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: signMAC(key, data)})
+
+	got := getSession(r, key)
+	if !got.EditMode {
+		t.Fatal("should preserve EditMode from session")
+	}
+	if got.CSRFToken == "" {
+		t.Fatal("should generate CSRF token when missing from session")
+	}
+}
