@@ -83,6 +83,14 @@ func (a *App) healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
+	if tok := a.cfg.APIToken; tok != "" {
+		auth := r.Header.Get("Authorization")
+		if subtle.ConstantTimeCompare([]byte(auth), []byte("Bearer "+tok)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	tokens, err := a.db.activeTokens()
 	if err != nil {
 		slog.Error("get_new_codes: db error", "err", err)

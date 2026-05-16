@@ -54,6 +54,7 @@ Para usar MySQL, descomente o bloco `db` no `docker-compose.yml` e defina as var
 | `APP_NAME`      | `MFA Tokens`  | Nome exibido na interface                                  |
 | `SECRET_KEY`    | gerado        | Chave Flask para sessões — defina um valor fixo em produção|
 | `EDIT_PASS`     | *(vazio)*     | Senha para ativar o modo de edição                         |
+| `API_TOKEN`     | *(vazio)*     | Se definido, exige `Authorization: Bearer <token>` em `/get_new_codes` |
 | `REGISTER_ABLE` | `true`        | Habilita o cadastro de novos tokens                        |
 | `TABLE_NAME`    | `mfa_tokens`  | Nome da tabela no banco de dados                           |
 | `MAX_UPLOAD_MB` | `5`           | Tamanho máximo do upload de QR code em MB                  |
@@ -144,7 +145,7 @@ A aplicação sobe em `http://0.0.0.0:5000` via Waitress.
 
 **Segurança**
 - [ ] Rate limiting por IP no `toggle_edit` contra força bruta ([#38](https://github.com/NatanRigailo/mfa-app/issues/38))
-- [ ] Autenticação via `API_TOKEN` no `/get_new_codes` ([#39](https://github.com/NatanRigailo/mfa-app/issues/39))
+- [x] Autenticação via `API_TOKEN` no `/get_new_codes` ([#39](https://github.com/NatanRigailo/mfa-app/issues/39))
 
 **Qualidade**
 - [ ] Suite de testes Go com `httptest` e banco in-memory ([#40](https://github.com/NatanRigailo/mfa-app/issues/40))
