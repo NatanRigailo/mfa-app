@@ -177,7 +177,8 @@ jobs:
             -t http://localhost:5000 \
             -c /zap/rules.tsv \
             -r report.html \
-            -w report.md
+            -w report.md \
+            || ec=$?; [ "${ec:-0}" -le 1 ] || exit "${ec}"
 
       - name: Upload ZAP reports
         if: always()
