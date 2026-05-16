@@ -106,6 +106,20 @@ func (a *App) render(w http.ResponseWriter, page string, data any) {
 	}
 }
 
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "+
+				"style-src 'self' 'unsafe-inline' fonts.googleapis.com; "+
+				"font-src fonts.gstatic.com; "+
+				"img-src 'self' data:")
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	cfg := loadConfig()
 	initLogger(cfg.LogLevel)
@@ -146,7 +160,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      mux,
+		Handler:      securityHeaders(mux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
