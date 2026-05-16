@@ -31,6 +31,7 @@ type Config struct {
 	DBDatabase   string
 	TableName    string
 	SQLitePath   string
+	APIToken     string
 }
 
 func loadConfig() Config {
@@ -63,6 +64,7 @@ func loadConfig() Config {
 		DBDatabase:   os.Getenv("DB_DATABASE"),
 		TableName:    envOr("TABLE_NAME", "mfa_tokens"),
 		SQLitePath:   envOr("SQLITE_PATH", "/data/tokens.db"),
+		APIToken:     os.Getenv("API_TOKEN"),
 	}
 }
 
