@@ -25,6 +25,7 @@ type Config struct {
 	DemoMode     bool
 	LogLevel     string
 	Port         string
+	DBDriver     string
 	DBHost       string
 	DBUser       string
 	DBPassword   string
@@ -58,6 +59,7 @@ func loadConfig() Config {
 		DemoMode:     os.Getenv("DEMO_MODE") == "true",
 		LogLevel:     envOr("LOG_LEVEL", "INFO"),
 		Port:         envOr("PORT", "5000"),
+		DBDriver:     os.Getenv("DB_DRIVER"),
 		DBHost:       os.Getenv("DB_HOST"),
 		DBUser:       os.Getenv("DB_USER"),
 		DBPassword:   os.Getenv("DB_PASSWORD"),
