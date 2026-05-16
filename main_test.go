@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -22,8 +23,14 @@ func TestSecurityHeaders(t *testing.T) {
 	if got := w.Header().Get("X-Frame-Options"); got != "DENY" {
 		t.Errorf("X-Frame-Options = %q, want DENY", got)
 	}
-	if w.Header().Get("Content-Security-Policy") == "" {
+	csp := w.Header().Get("Content-Security-Policy")
+	if csp == "" {
 		t.Error("Content-Security-Policy header not set")
+	}
+	for _, directive := range []string{"frame-ancestors", "form-action", "base-uri"} {
+		if !strings.Contains(csp, directive) {
+			t.Errorf("CSP missing directive %q", directive)
+		}
 	}
 }
 

@@ -117,7 +117,10 @@ func securityHeaders(next http.Handler) http.Handler {
 				"script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "+
 				"style-src 'self' 'unsafe-inline' fonts.googleapis.com; "+
 				"font-src fonts.gstatic.com; "+
-				"img-src 'self' data:")
+				"img-src 'self' data:; "+
+				"frame-ancestors 'none'; "+
+				"form-action 'self'; "+
+				"base-uri 'self'")
 		next.ServeHTTP(w, r)
 	})
 }

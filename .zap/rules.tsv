@@ -3,3 +3,5 @@
 10017	IGNORE	(Cross-Domain JavaScript Source File Inclusion)
 90004	IGNORE	(Cross-Origin-Embedder-Policy Header Missing or Invalid)
 10063	IGNORE	(Permissions Policy Header Not Set)
+10049	IGNORE	(Non-Storable Content)
+10112	IGNORE	(Session Management Response Identified)
