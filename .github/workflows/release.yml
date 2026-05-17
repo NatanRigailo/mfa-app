@@ -42,6 +42,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
+      - name: Set up Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4
+
       - name: Log in to GHCR
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
@@ -59,7 +62,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.tag.outputs.new_tag }}
             type=raw,value=latest
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
@@ -70,11 +73,41 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Update Helm chart version
+        env:
+          TAG: ${{ needs.tag.outputs.new_tag }}
+        run: |
+          VERSION="${TAG#v}"
+          sed -i "s/^version:.*/version: \"${VERSION}\"/" deploy/helm/mfa-app/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" deploy/helm/mfa-app/Chart.yaml
+
+      - name: Package Helm chart
+        env:
+          TAG: ${{ needs.tag.outputs.new_tag }}
+        run: |
+          VERSION="${TAG#v}"
+          helm package deploy/helm/mfa-app/ --version "${VERSION}" --app-version "${VERSION}"
+
+      - name: Push Helm chart to GHCR
+        env:
+          TAG: ${{ needs.tag.outputs.new_tag }}
+          HELM_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${TAG#v}"
+          echo "${HELM_REGISTRY_PASSWORD}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" --password-stdin
+          helm push "mfa-app-${VERSION}.tgz" oci://ghcr.io/natanrigailo
+
       - name: Create GitHub Release
+        env:
+          TAG: ${{ needs.tag.outputs.new_tag }}
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
           tag_name: ${{ needs.tag.outputs.new_tag }}
           generate_release_notes: true
+          files: |
+            mfa-app-*.tgz
+            deploy/kubernetes.yaml
           body: |
             ## Docker
 
@@ -86,6 +119,16 @@ jobs:
             |-----|--------|
             | versão exata | `ghcr.io/natanrigailo/mfa-app:${{ needs.tag.outputs.new_tag }}` |
             | latest | `ghcr.io/natanrigailo/mfa-app:latest` |
+
+            ## Kubernetes
+
+            ```bash
+            # Raw manifest
+            kubectl apply -f https://github.com/NatanRigailo/mfa-app/releases/download/${{ needs.tag.outputs.new_tag }}/kubernetes.yaml
+
+            # Helm (OCI)
+            helm install mfa-app oci://ghcr.io/natanrigailo/mfa-app --version ${{ needs.tag.outputs.new_tag }}
+            ```
 
   deploy:
     name: Deploy to Render

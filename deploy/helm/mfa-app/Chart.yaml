@@ -1,0 +1,17 @@
+apiVersion: v2
+name: mfa-app
+description: Self-hosted TOTP token manager
+type: application
+version: "0.1.0"
+appVersion: "2.0.0"
+home: https://github.com/NatanRigailo/mfa-app
+sources:
+  - https://github.com/NatanRigailo/mfa-app
+maintainers:
+  - name: NatanRigailo
+    url: https://github.com/NatanRigailo
+keywords:
+  - mfa
+  - totp
+  - 2fa
+  - security
