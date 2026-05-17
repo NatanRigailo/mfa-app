@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -63,6 +64,61 @@ func openPostgresDSN(dsn, tableName string) (*Database, error) {
 		return nil, err
 	}
 	return d, nil
+}
+
+func testDB(t *testing.T) *Database {
+	t.Helper()
+	cfg := Config{TableName: "mfa_tokens", SQLitePath: filepath.Join(t.TempDir(), "test.db")}
+	db, err := initDB(cfg)
+	if err != nil {
+		t.Fatalf("initDB: %v", err)
+	}
+	t.Cleanup(func() { db.Close() }) //nolint:errcheck
+	return db
+}
+
+func TestImportTokens(t *testing.T) {
+	db := testDB(t)
+
+	if err := db.createToken("existing", "JBSWY3DPEHPK3PXP"); err != nil {
+		t.Fatalf("createToken: %v", err)
+	}
+
+	entries := []importEntry{
+		{name: "existing", secret: "JBSWY3DPEHPK3PXP"}, // duplicate by name → skip
+		{name: "new-one", secret: "MFRGGZDFMZTWQ2LK"},
+		{name: "new-two", secret: "NBSWY3DPEHPK3PXP"},
+	}
+
+	imported, skipped, err := db.importTokens(entries)
+	if err != nil {
+		t.Fatalf("importTokens: %v", err)
+	}
+	if imported != 2 {
+		t.Errorf("imported = %d, want 2", imported)
+	}
+	if skipped != 1 {
+		t.Errorf("skipped = %d, want 1", skipped)
+	}
+
+	tokens, err := db.allTokens()
+	if err != nil {
+		t.Fatalf("allTokens: %v", err)
+	}
+	if len(tokens) != 3 {
+		t.Errorf("total tokens = %d, want 3", len(tokens))
+	}
+}
+
+func TestImportTokens_Empty(t *testing.T) {
+	db := testDB(t)
+	imported, skipped, err := db.importTokens(nil)
+	if err != nil {
+		t.Fatalf("importTokens: %v", err)
+	}
+	if imported != 0 || skipped != 0 {
+		t.Errorf("want 0/0, got %d/%d", imported, skipped)
+	}
 }
 
 func TestInitDB_PostgreSQL(t *testing.T) {

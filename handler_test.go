@@ -1147,3 +1147,210 @@ func TestIndexPost_UpdateTokens(t *testing.T) {
 		t.Fatalf("expected token renamed to NewName, got %q", updated[0].Name)
 	}
 }
+
+// importFileRequest builds a POST /import multipart request with a JSON file.
+func importFileRequest(t *testing.T, csrfToken, jsonContent string, cookie *http.Cookie) *http.Request {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if err := mw.WriteField("csrf_token", csrfToken); err != nil {
+		t.Fatalf("write csrf: %v", err)
+	}
+	fw, err := mw.CreateFormFile("file", "backup.json")
+	if err != nil {
+		t.Fatalf("create form file: %v", err)
+	}
+	if _, err := fw.Write([]byte(jsonContent)); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("close multipart: %v", err)
+	}
+	r := httptest.NewRequest("POST", "/import", &buf)
+	r.Header.Set("Content-Type", mw.FormDataContentType())
+	r.AddCookie(cookie)
+	return r
+}
+
+func validAegisJSON(entries []aegisEntry) string {
+	vault := aegisVault{
+		Version: 1,
+		Header:  aegisHeader{Slots: json.RawMessage("null"), Params: json.RawMessage("null")},
+		DB:      aegisDB{Version: 3, Entries: entries},
+	}
+	data, _ := json.Marshal(vault)
+	return string(data)
+}
+
+func TestExportGet_NotInEditMode(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok"}
+	r := httptest.NewRequest("GET", "/export", nil)
+	r.AddCookie(signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.exportGet(w, r)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("want 403, got %d", w.Code)
+	}
+}
+
+func TestExportGet_InEditMode(t *testing.T) {
+	app := testApp(t)
+	if err := app.db.createToken("GitHub", "JBSWY3DPEHPK3PXP"); err != nil {
+		t.Fatalf("createToken: %v", err)
+	}
+
+	sess := Session{CSRFToken: "tok", EditMode: true}
+	r := httptest.NewRequest("GET", "/export", nil)
+	r.AddCookie(signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.exportGet(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d", w.Code)
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
+	}
+	if cd := w.Header().Get("Content-Disposition"); !strings.Contains(cd, "mfa-export.json") {
+		t.Errorf("Content-Disposition = %q, missing filename", cd)
+	}
+
+	var vault aegisVault
+	if err := json.Unmarshal(w.Body.Bytes(), &vault); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if vault.Version != 1 {
+		t.Errorf("vault.Version = %d, want 1", vault.Version)
+	}
+	if len(vault.DB.Entries) != 1 || vault.DB.Entries[0].Name != "GitHub" {
+		t.Errorf("unexpected entries: %+v", vault.DB.Entries)
+	}
+	if vault.DB.Entries[0].Type != "totp" {
+		t.Errorf("entry type = %q, want totp", vault.DB.Entries[0].Type)
+	}
+}
+
+func TestImportPost_NotInEditMode(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok"}
+	r := importFileRequest(t, "tok", validAegisJSON(nil), signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	if flash := responseSession(t, app.cfg.SecretKey, w).Flashes; len(flash) == 0 || flash[0].Category != "error" {
+		t.Errorf("expected error flash")
+	}
+}
+
+func TestImportPost_NoCSRF(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "real-token", EditMode: true}
+	r := importFileRequest(t, "wrong-token", validAegisJSON(nil), signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+	if flash := responseSession(t, app.cfg.SecretKey, w).Flashes; len(flash) == 0 || flash[0].Category != "error" {
+		t.Errorf("expected error flash")
+	}
+}
+
+func TestImportPost_InvalidJSON(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok", EditMode: true}
+	r := importFileRequest(t, "tok", "not valid json", signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+	flash := responseSession(t, app.cfg.SecretKey, w).Flashes
+	if len(flash) == 0 || flash[0].Category != "error" {
+		t.Errorf("expected error flash")
+	}
+}
+
+func TestImportPost_NoValidEntries(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok", EditMode: true}
+	body := validAegisJSON([]aegisEntry{{Type: "hotp", Name: "skip-me"}})
+	r := importFileRequest(t, "tok", body, signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+	flash := responseSession(t, app.cfg.SecretKey, w).Flashes
+	if len(flash) == 0 || flash[0].Category != "error" {
+		t.Errorf("expected error flash for no TOTP entries")
+	}
+}
+
+func TestImportPost_ValidFile(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok", EditMode: true}
+
+	entries := []aegisEntry{
+		{Type: "totp", Name: "GitHub", Info: aegisInfo{Secret: "JBSWY3DPEHPK3PXP", Algo: "SHA1", Digits: 6, Period: 30}},
+		{Type: "totp", Name: "AWS", Info: aegisInfo{Secret: "MFRGGZDFMZTWQ2LK", Algo: "SHA1", Digits: 6, Period: 30}},
+	}
+	r := importFileRequest(t, "tok", validAegisJSON(entries), signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", w.Code)
+	}
+	flash := responseSession(t, app.cfg.SecretKey, w).Flashes
+	if len(flash) == 0 || flash[0].Category != "success" {
+		t.Fatalf("expected success flash, got %+v", flash)
+	}
+	if !strings.Contains(flash[0].Message, "2 token(s) importado(s)") {
+		t.Errorf("unexpected message: %q", flash[0].Message)
+	}
+
+	tokens, _ := app.db.allTokens()
+	if len(tokens) != 2 {
+		t.Errorf("want 2 tokens in db, got %d", len(tokens))
+	}
+}
+
+func TestImportPost_SkipDuplicates(t *testing.T) {
+	app := testApp(t)
+	if err := app.db.createToken("GitHub", "JBSWY3DPEHPK3PXP"); err != nil {
+		t.Fatalf("createToken: %v", err)
+	}
+
+	sess := Session{CSRFToken: "tok", EditMode: true}
+	entries := []aegisEntry{
+		{Type: "totp", Name: "GitHub", Info: aegisInfo{Secret: "JBSWY3DPEHPK3PXP", Algo: "SHA1", Digits: 6, Period: 30}},
+		{Type: "totp", Name: "AWS", Info: aegisInfo{Secret: "MFRGGZDFMZTWQ2LK", Algo: "SHA1", Digits: 6, Period: 30}},
+	}
+	r := importFileRequest(t, "tok", validAegisJSON(entries), signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+
+	flash := responseSession(t, app.cfg.SecretKey, w).Flashes
+	if len(flash) == 0 || flash[0].Category != "success" {
+		t.Fatalf("expected success flash, got %+v", flash)
+	}
+	if !strings.Contains(flash[0].Message, "1 token(s) importado(s)") || !strings.Contains(flash[0].Message, "1 ignorado(s)") {
+		t.Errorf("unexpected message: %q", flash[0].Message)
+	}
+}
+
+func TestImportPost_NonTOTPSkipped(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok", EditMode: true}
+	entries := []aegisEntry{
+		{Type: "hotp", Name: "Skip HOTP", Info: aegisInfo{Secret: "JBSWY3DPEHPK3PXP"}},
+		{Type: "totp", Name: "Keep TOTP", Info: aegisInfo{Secret: "JBSWY3DPEHPK3PXP", Algo: "SHA1", Digits: 6, Period: 30}},
+	}
+	r := importFileRequest(t, "tok", validAegisJSON(entries), signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+
+	flash := responseSession(t, app.cfg.SecretKey, w).Flashes
+	if len(flash) == 0 || flash[0].Category != "success" {
+		t.Fatalf("expected success flash, got %+v", flash)
+	}
+	tokens, _ := app.db.allTokens()
+	if len(tokens) != 1 || tokens[0].Name != "Keep TOTP" {
+		t.Errorf("expected only TOTP token, got %+v", tokens)
+	}
+}

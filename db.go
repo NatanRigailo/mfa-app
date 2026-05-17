@@ -273,6 +273,39 @@ func (d *Database) seedDemo(cfg Config) error {
 	return nil
 }
 
+type importEntry struct {
+	name   string
+	secret string
+}
+
+func (d *Database) importTokens(entries []importEntry) (imported, skipped int, err error) {
+	tx, err := d.db.Begin()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	for _, e := range entries {
+		var count int
+		if err := tx.QueryRow(fmt.Sprintf(
+			`SELECT COUNT(*) FROM %s WHERE name = %s`, d.tableName, d.ph(1),
+		), e.name).Scan(&count); err != nil {
+			return imported, skipped, err
+		}
+		if count > 0 {
+			skipped++
+			continue
+		}
+		if _, err := tx.Exec(fmt.Sprintf(
+			`INSERT INTO %s (name, secret, ativo) VALUES (%s, %s, 1)`, d.tableName, d.ph(1), d.ph(2),
+		), e.name, e.secret); err != nil {
+			return imported, skipped, err
+		}
+		imported++
+	}
+	return imported, skipped, tx.Commit()
+}
+
 func randomBase32Secret() string {
 	b := make([]byte, 20)
 	rand.Read(b) //nolint:errcheck

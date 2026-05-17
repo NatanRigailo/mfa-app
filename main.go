@@ -170,6 +170,8 @@ func main() {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.HandleFunc("GET /healthz", app.healthz)
 	mux.HandleFunc("GET /get_new_codes", app.getNewCodes)
+	mux.HandleFunc("GET /export", app.exportGet)
+	mux.HandleFunc("POST /import", app.importPost)
 	mux.HandleFunc("GET /register", app.registerGet)
 	mux.HandleFunc("POST /register", app.registerPost)
 	mux.HandleFunc("POST /toggle_edit", app.toggleEdit)

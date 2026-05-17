@@ -58,8 +58,16 @@
 <form method="POST" action="/toggle_edit" id="exit-edit-form">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
 </form>
+<form method="POST" action="/import" enctype="multipart/form-data" id="import-form">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <input type="file" id="import-file" name="file" accept=".json" style="display:none" onchange="this.form.submit()">
+</form>
 <div class="edit-notice">
     <span>Modo de edição ativo</span>
+    <a href="/export" class="exit-edit-btn"><i class="ph ph-export"></i> Exportar</a>
+    <button type="button" onclick="document.getElementById('import-file').click()" class="exit-edit-btn">
+        <i class="ph ph-import"></i> Importar
+    </button>
     <button type="submit" form="exit-edit-form" class="exit-edit-btn">
         <i class="ph ph-sign-out"></i> Sair
     </button>
