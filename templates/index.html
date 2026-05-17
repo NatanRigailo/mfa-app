@@ -2,7 +2,7 @@
 <div class="search-container">
     <div class="search-wrapper">
         <i class="ph ph-magnifying-glass search-icon"></i>
-        <input type="text" id="search" placeholder="Buscar token..." oninput="filterTokens()">
+        <input type="text" id="search" placeholder="Buscar token...">
     </div>
 </div>
 
@@ -11,7 +11,7 @@
 <div id="grouped-tokens">
     {{ range .Groups }}
     <div class="letter-section">
-        <div class="letter-header" onclick="toggleSection('{{ .Letter }}', this)">
+        <div class="letter-header" data-letter="{{ .Letter }}">
             <i class="ph ph-caret-down toggle-icon"></i>
             {{ .Letter }}
         </div>
@@ -31,7 +31,7 @@
                     <button type="submit" class="edit-save-btn">Salvar</button>
                 </form>
                 <form method="POST" action="/delete/{{ .ID }}"
-                      onsubmit="return confirm('Remover {{ .Name }}? Esta ação não pode ser desfeita.')">
+                      data-confirm="Remover {{ .Name }}? Esta ação não pode ser desfeita.">
                     <input type="hidden" name="csrf_token" value="{{ $root.CSRFToken }}">
                     <button type="submit" class="edit-delete-btn">Remover</button>
                 </form>
@@ -58,14 +58,22 @@
 <form method="POST" action="/toggle_edit" id="exit-edit-form">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
 </form>
+<form method="POST" action="/import" enctype="multipart/form-data" id="import-form">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <input type="file" id="import-file" name="file" accept=".json" class="hidden">
+</form>
 <div class="edit-notice">
     <span>Modo de edição ativo</span>
+    <a href="/export" class="exit-edit-btn"><i class="ph ph-export"></i> Exportar</a>
+    <button type="button" id="import-btn" class="exit-edit-btn">
+        <i class="ph ph-import"></i> Importar
+    </button>
     <button type="submit" form="exit-edit-form" class="exit-edit-btn">
         <i class="ph ph-sign-out"></i> Sair
     </button>
 </div>
 {{ else }}
-<button class="edit-fab" onclick="openEditPrompt()" title="Editar tokens">
+<button class="edit-fab" id="edit-fab" title="Editar tokens">
     <i class="ph ph-pencil-simple"></i>
 </button>
 {{ end }}
@@ -132,7 +140,26 @@
     document.addEventListener('DOMContentLoaded', () => {
         fetchNewCodes();
 
+        document.getElementById('search')?.addEventListener('input', filterTokens);
+
+        document.getElementById('edit-fab')?.addEventListener('click', openEditPrompt);
+
+        document.getElementById('import-btn')?.addEventListener('click', () => {
+            document.getElementById('import-file')?.click();
+        });
+
+        document.getElementById('import-file')?.addEventListener('change', function() {
+            this.form.submit();
+        });
+
         document.addEventListener('click', e => {
+            const header = e.target.closest('.letter-header');
+            if (header) {
+                const grid = document.getElementById('grid-' + header.dataset.letter);
+                const collapsed = grid.classList.toggle('hidden');
+                header.classList.toggle('collapsed', collapsed);
+                return;
+            }
             const btn = e.target.closest('.copy-btn');
             if (!btn) return;
             const code = liveCodes[btn.dataset.tokenId];
@@ -146,6 +173,11 @@
                     btn.classList.remove('copied');
                 }, 1500);
             }).catch(err => console.error('Copy failed:', err));
+        });
+
+        document.addEventListener('submit', e => {
+            const msg = e.target.dataset.confirm;
+            if (msg && !confirm(msg)) e.preventDefault();
         });
     });
 

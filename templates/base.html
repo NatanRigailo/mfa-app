@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
+    <link rel="stylesheet" href="/static/phosphor/style.css">
     <style nonce="{{ .Nonce }}">
         :root {
             --bg:         #0d0d0d;
@@ -73,6 +73,8 @@
         .btn:hover { background: #2a2a2a; border-color: var(--border-2); }
         .btn-accent { background: var(--accent); border-color: var(--accent); color: #0d0d0d; }
         .btn-accent:hover { background: #22c55e; border-color: #22c55e; color: #0d0d0d; }
+        .btn-full { width: 100%; justify-content: center; padding: 10px 14px; margin-top: 4px; }
+        .hidden { display: none; }
 
         main { padding: 24px; max-width: 1400px; margin: 0 auto; }
 
@@ -241,7 +243,7 @@
         .edit-fab { position: fixed; bottom: 20px; right: 20px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: color 0.15s, border-color 0.15s, box-shadow 0.15s; z-index: 50; }
         .edit-fab:hover { color: var(--text); border-color: var(--border-2); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
         .edit-notice { position: fixed; bottom: 20px; right: 20px; display: flex; align-items: center; gap: 10px; background: var(--accent); color: #0d0d0d; padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; z-index: 50; box-shadow: 0 4px 16px rgba(74,222,128,0.25); }
-        .exit-edit-btn { display: inline-flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.15); border: none; border-radius: var(--radius-sm); color: #0d0d0d; font-family: inherit; font-size: 12px; font-weight: 600; padding: 3px 8px; cursor: pointer; transition: background 0.15s; }
+        .exit-edit-btn { display: inline-flex; align-items: center; gap: 4px; background: rgba(0,0,0,0.15); border: none; border-radius: var(--radius-sm); color: #0d0d0d; font-family: inherit; font-size: 12px; font-weight: 600; padding: 3px 8px; cursor: pointer; transition: background 0.15s; text-decoration: none; }
         .exit-edit-btn:hover { background: rgba(0,0,0,0.25); }
 
         /* Register page */

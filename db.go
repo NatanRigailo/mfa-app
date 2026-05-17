@@ -273,6 +273,29 @@ func (d *Database) seedDemo(cfg Config) error {
 	return nil
 }
 
+type importEntry struct {
+	name   string
+	secret string
+}
+
+func (d *Database) importTokens(entries []importEntry) (imported, skipped int, err error) {
+	for _, e := range entries {
+		existing, err := d.tokenByName(e.name)
+		if err != nil {
+			return imported, skipped, err
+		}
+		if existing != nil {
+			skipped++
+			continue
+		}
+		if err := d.createToken(e.name, e.secret); err != nil {
+			return imported, skipped, err
+		}
+		imported++
+	}
+	return imported, skipped, nil
+}
+
 func randomBase32Secret() string {
 	b := make([]byte, 20)
 	rand.Read(b) //nolint:errcheck

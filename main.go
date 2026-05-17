@@ -127,9 +127,9 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
-				"script-src 'self' 'nonce-"+nonce+"' cdn.jsdelivr.net; "+
+				"script-src 'self' 'nonce-"+nonce+"'; "+
 				"style-src 'self' 'nonce-"+nonce+"' fonts.googleapis.com; "+
-				"font-src fonts.gstatic.com; "+
+				"font-src 'self' fonts.gstatic.com; "+
 				"img-src 'self' data:; "+
 				"frame-ancestors 'none'; "+
 				"form-action 'self'; "+
@@ -170,6 +170,8 @@ func main() {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	mux.HandleFunc("GET /healthz", app.healthz)
 	mux.HandleFunc("GET /get_new_codes", app.getNewCodes)
+	mux.HandleFunc("GET /export", app.exportGet)
+	mux.HandleFunc("POST /import", app.importPost)
 	mux.HandleFunc("GET /register", app.registerGet)
 	mux.HandleFunc("POST /register", app.registerPost)
 	mux.HandleFunc("POST /toggle_edit", app.toggleEdit)

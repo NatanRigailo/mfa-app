@@ -21,7 +21,13 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
-const registerPath = "/register"
+const (
+	registerPath    = "/register"
+	contentTypeJSON = "application/json"
+	headerCT        = "Content-Type"
+	msgInternalErr  = "internal error"
+	msgInvalidCSRF  = "Token de segurança inválido."
+)
 
 type PageData struct {
 	AppName   string
@@ -76,7 +82,7 @@ func groupTokens(tokens []Token) []LetterGroup {
 }
 
 func (a *App) healthz(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerCT, contentTypeJSON)
 	if err := a.db.Ping(); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]string{"status": "error", "db": err.Error()}) //nolint:errcheck,gosec
@@ -97,7 +103,7 @@ func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
 	tokens, err := a.db.activeTokens()
 	if err != nil {
 		slog.Error("get_new_codes: db error", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
 		return
 	}
 
@@ -112,7 +118,7 @@ func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
 		codes[t.Name] = code
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerCT, contentTypeJSON)
 	json.NewEncoder(w).Encode(map[string]any{"codes": codes}) //nolint:errcheck,gosec
 }
 
@@ -128,7 +134,7 @@ func (a *App) index(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Error("index: db error", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
 		return
 	}
 
@@ -208,7 +214,7 @@ func (a *App) toggleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !sess.validCSRF(r.FormValue("csrf_token")) {
-		redirect("error", "Token de segurança inválido.")
+		redirect("error", msgInvalidCSRF)
 		return
 	}
 
@@ -246,7 +252,7 @@ func (a *App) deleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !sess.validCSRF(r.FormValue("csrf_token")) {
-		redirect("error", "Token de segurança inválido.")
+		redirect("error", msgInvalidCSRF)
 		return
 	}
 
@@ -399,4 +405,153 @@ func extractSecretFromURI(uri string) string {
 		return ""
 	}
 	return parsed.Query().Get("secret")
+}
+
+// Aegis vault format: https://github.com/beemdevelopment/Aegis/blob/master/docs/vault.md
+type aegisVault struct {
+	Version int         `json:"version"`
+	Header  aegisHeader `json:"header"`
+	DB      aegisDB     `json:"db"`
+}
+
+type aegisHeader struct {
+	Slots  json.RawMessage `json:"slots"`
+	Params json.RawMessage `json:"params"`
+}
+
+type aegisDB struct {
+	Version int          `json:"version"`
+	Entries []aegisEntry `json:"entries"`
+}
+
+type aegisEntry struct {
+	Type   string    `json:"type"`
+	Name   string    `json:"name"`
+	Issuer string    `json:"issuer"`
+	Note   string    `json:"note"`
+	Info   aegisInfo `json:"info"`
+}
+
+type aegisInfo struct {
+	Secret string `json:"secret"`
+	Algo   string `json:"algo"`
+	Digits int    `json:"digits"`
+	Period int    `json:"period"`
+}
+
+func (a *App) exportGet(w http.ResponseWriter, r *http.Request) {
+	sess := getSession(r, a.cfg.SecretKey)
+	if !sess.EditMode {
+		http.Error(w, "edit mode required", http.StatusForbidden)
+		return
+	}
+
+	tokens, err := a.db.allTokens()
+	if err != nil {
+		slog.Error("export: db error", "err", err)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
+		return
+	}
+
+	entries := make([]aegisEntry, len(tokens))
+	for i, t := range tokens {
+		entries[i] = aegisEntry{
+			Type:   "totp",
+			Name:   t.Name,
+			Issuer: "",
+			Note:   "",
+			Info:   aegisInfo{Secret: t.Secret, Algo: "SHA1", Digits: 6, Period: 30},
+		}
+	}
+
+	vault := aegisVault{
+		Version: 1,
+		Header:  aegisHeader{Slots: json.RawMessage("null"), Params: json.RawMessage("null")},
+		DB:      aegisDB{Version: 3, Entries: entries},
+	}
+
+	data, err := json.MarshalIndent(vault, "", "  ")
+	if err != nil {
+		slog.Error("export: marshal error", "err", err)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set(headerCT, contentTypeJSON)
+	w.Header().Set("Content-Disposition", `attachment; filename="mfa-export.json"`)
+	w.Write(data) //nolint:errcheck
+}
+
+func (a *App) importPost(w http.ResponseWriter, r *http.Request) {
+	sess := getSession(r, a.cfg.SecretKey)
+
+	redirect := func(category, msg string) {
+		sess.addFlash(category, msg)
+		saveSession(w, a.cfg.SecretKey, sess)
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+
+	if !sess.EditMode {
+		redirect("error", "Modo de edição não está ativo.")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, a.cfg.MaxUploadMB*1024*1024)
+	if err := r.ParseMultipartForm(a.cfg.MaxUploadMB * 1024 * 1024); err != nil { //nolint:gosec
+		redirect("error", "Erro ao processar formulário.")
+		return
+	}
+	if !sess.validCSRF(r.FormValue("csrf_token")) {
+		redirect("error", msgInvalidCSRF)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		redirect("error", "Nenhum arquivo enviado.")
+		return
+	}
+	defer file.Close() //nolint:errcheck
+
+	var vault aegisVault
+	if err := json.NewDecoder(file).Decode(&vault); err != nil {
+		redirect("error", "Arquivo inválido ou corrompido.")
+		return
+	}
+
+	if vault.Version != 1 {
+		redirect("error", "Formato Aegis não suportado (versão incompatível).")
+		return
+	}
+
+	var entries []importEntry
+	for _, e := range vault.DB.Entries {
+		if e.Type != "totp" {
+			continue
+		}
+		name := strings.TrimSpace(e.Name)
+		secret := sanitizeSecret(e.Info.Secret)
+		if name == "" || secret == "" {
+			continue
+		}
+		entries = append(entries, importEntry{name: name, secret: secret})
+	}
+
+	if len(entries) == 0 {
+		redirect("error", "Nenhum token TOTP válido encontrado no arquivo.")
+		return
+	}
+
+	imported, skipped, err := a.db.importTokens(entries)
+	if err != nil {
+		slog.Error("import: db error", "err", err)
+		redirect("error", "Erro ao importar tokens.")
+		return
+	}
+
+	msg := fmt.Sprintf("%d token(s) importado(s)", imported)
+	if skipped > 0 {
+		msg += fmt.Sprintf(", %d ignorado(s) por já existirem", skipped)
+	}
+	redirect("success", msg+".")
 }
