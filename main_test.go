@@ -4,11 +4,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestSecurityHeaders(t *testing.T) {
+	var capturedNonce string
 	handler := securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedNonce, _ = r.Context().Value(nonceKey).(string)
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -22,8 +25,27 @@ func TestSecurityHeaders(t *testing.T) {
 	if got := w.Header().Get("X-Frame-Options"); got != "DENY" {
 		t.Errorf("X-Frame-Options = %q, want DENY", got)
 	}
-	if w.Header().Get("Content-Security-Policy") == "" {
+	csp := w.Header().Get("Content-Security-Policy")
+	if csp == "" {
 		t.Error("Content-Security-Policy header not set")
+	}
+	for _, directive := range []string{"frame-ancestors", "form-action", "base-uri"} {
+		if !strings.Contains(csp, directive) {
+			t.Errorf("CSP missing directive %q", directive)
+		}
+	}
+	for _, part := range strings.Split(csp, ";") {
+		part = strings.TrimSpace(part)
+		if (strings.HasPrefix(part, "script-src") || strings.HasPrefix(part, "style-src")) &&
+			strings.Contains(part, "'unsafe-inline'") {
+			t.Errorf("CSP %s must not contain 'unsafe-inline'", strings.Fields(part)[0])
+		}
+	}
+	if capturedNonce == "" {
+		t.Error("nonce not set in request context")
+	}
+	if !strings.Contains(csp, "'nonce-"+capturedNonce+"'") {
+		t.Errorf("CSP script-src missing nonce %q", capturedNonce)
 	}
 }
 

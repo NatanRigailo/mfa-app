@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq" // registers the "postgres" driver with database/sql
 	_ "modernc.org/sqlite"
 )
 
@@ -29,8 +31,48 @@ type TokenUpdate struct {
 }
 
 type Database struct {
-	db        *sql.DB
-	tableName string
+	db          *sql.DB
+	tableName   string
+	driver      string
+	placeholder func(n int) string
+}
+
+func questionMark(_ int) string { return "?" }
+
+func dollarN(n int) string { return fmt.Sprintf("$%d", n) }
+
+func (d *Database) ph(n int) string { return d.placeholder(n) }
+
+func schemaSQL(driver, tableName string) string {
+	switch driver {
+	case "postgres":
+		return fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s (
+				id     BIGSERIAL PRIMARY KEY,
+				name   TEXT NOT NULL UNIQUE,
+				secret TEXT NOT NULL UNIQUE,
+				ativo  INTEGER NOT NULL DEFAULT 1
+			)`, tableName)
+	case "mysql":
+		return fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s (
+				id     INT NOT NULL AUTO_INCREMENT,
+				name   TEXT NOT NULL,
+				secret TEXT NOT NULL,
+				ativo  INTEGER NOT NULL DEFAULT 1,
+				PRIMARY KEY (id),
+				UNIQUE KEY uq_name (name(191)),
+				UNIQUE KEY uq_secret (secret(191))
+			) ENGINE=InnoDB`, tableName)
+	default:
+		return fmt.Sprintf(`
+			CREATE TABLE IF NOT EXISTS %s (
+				id     INTEGER PRIMARY KEY AUTOINCREMENT,
+				name   TEXT NOT NULL UNIQUE,
+				secret TEXT NOT NULL UNIQUE,
+				ativo  INTEGER NOT NULL DEFAULT 1
+			)`, tableName)
+	}
 }
 
 func initDB(cfg Config) (*Database, error) {
@@ -39,13 +81,24 @@ func initDB(cfg Config) (*Database, error) {
 	}
 
 	var driver, dsn string
-	if cfg.DBHost != "" {
+	switch {
+	case cfg.DBHost != "" && strings.ToLower(cfg.DBDriver) == "postgres":
+		driver = "postgres"
+		u := url.URL{
+			Scheme: "postgres",
+			User:   url.UserPassword(cfg.DBUser, cfg.DBPassword),
+			Host:   cfg.DBHost,
+			Path:   "/" + cfg.DBDatabase,
+		}
+		dsn = u.String()
+		slog.Info("using PostgreSQL", "host", cfg.DBHost, "db", cfg.DBDatabase)
+	case cfg.DBHost != "":
 		driver = "mysql"
 		password := url.QueryEscape(cfg.DBPassword)
 		dsn = fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true&timeout=5s",
 			cfg.DBUser, password, cfg.DBHost, cfg.DBDatabase)
 		slog.Info("using MySQL", "host", cfg.DBHost, "db", cfg.DBDatabase)
-	} else {
+	default:
 		driver = "sqlite"
 		dsn = cfg.SQLitePath
 		slog.Info("using SQLite", "path", cfg.SQLitePath)
@@ -59,7 +112,7 @@ func initDB(cfg Config) (*Database, error) {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
 
-	if cfg.DBHost == "" {
+	if driver == "sqlite" {
 		if _, err := db.Exec(`PRAGMA journal_mode=WAL`); err != nil {
 			return nil, fmt.Errorf("set journal_mode: %w", err)
 		}
@@ -68,7 +121,12 @@ func initDB(cfg Config) (*Database, error) {
 		}
 	}
 
-	d := &Database{db: db, tableName: cfg.TableName}
+	ph := questionMark
+	if driver == "postgres" {
+		ph = dollarN
+	}
+
+	d := &Database{db: db, tableName: cfg.TableName, driver: driver, placeholder: ph}
 	if err := d.createSchema(); err != nil {
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
@@ -80,13 +138,7 @@ func (d *Database) Close() error { return d.db.Close() }
 func (d *Database) Ping() error { return d.db.Ping() }
 
 func (d *Database) createSchema() error {
-	_, err := d.db.Exec(fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			id     INTEGER PRIMARY KEY AUTOINCREMENT,
-			name   TEXT NOT NULL UNIQUE,
-			secret TEXT NOT NULL UNIQUE,
-			ativo  INTEGER NOT NULL DEFAULT 1
-		)`, d.tableName))
+	_, err := d.db.Exec(schemaSQL(d.driver, d.tableName))
 	return err
 }
 
@@ -126,7 +178,7 @@ func (d *Database) getToken(id int64) (*Token, error) {
 	var t Token
 	var active int
 	err := d.db.QueryRow(fmt.Sprintf(
-		`SELECT id, name, secret, ativo FROM %s WHERE id = ?`, d.tableName,
+		`SELECT id, name, secret, ativo FROM %s WHERE id = %s`, d.tableName, d.ph(1),
 	), id).Scan(&t.ID, &t.Name, &t.Secret, &active)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -142,7 +194,7 @@ func (d *Database) tokenByName(name string) (*Token, error) {
 	var t Token
 	var active int
 	err := d.db.QueryRow(fmt.Sprintf(
-		`SELECT id, name, secret, ativo FROM %s WHERE name = ?`, d.tableName,
+		`SELECT id, name, secret, ativo FROM %s WHERE name = %s`, d.tableName, d.ph(1),
 	), name).Scan(&t.ID, &t.Name, &t.Secret, &active)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -156,7 +208,7 @@ func (d *Database) tokenByName(name string) (*Token, error) {
 
 func (d *Database) createToken(name, secret string) error {
 	_, err := d.db.Exec(fmt.Sprintf(
-		`INSERT INTO %s (name, secret, ativo) VALUES (?, ?, 1)`, d.tableName,
+		`INSERT INTO %s (name, secret, ativo) VALUES (%s, %s, 1)`, d.tableName, d.ph(1), d.ph(2),
 	), name, secret)
 	return err
 }
@@ -174,7 +226,7 @@ func (d *Database) updateTokens(updates []TokenUpdate) error {
 			activeInt = 1
 		}
 		if _, err := tx.Exec(fmt.Sprintf(
-			`UPDATE %s SET name = ?, ativo = ? WHERE id = ?`, d.tableName,
+			`UPDATE %s SET name = %s, ativo = %s WHERE id = %s`, d.tableName, d.ph(1), d.ph(2), d.ph(3),
 		), u.Name, activeInt, u.ID); err != nil {
 			return err
 		}
@@ -184,7 +236,7 @@ func (d *Database) updateTokens(updates []TokenUpdate) error {
 
 func (d *Database) deleteToken(id int64) error {
 	_, err := d.db.Exec(fmt.Sprintf(
-		`DELETE FROM %s WHERE id = ?`, d.tableName,
+		`DELETE FROM %s WHERE id = %s`, d.tableName, d.ph(1),
 	), id)
 	return err
 }
@@ -192,7 +244,7 @@ func (d *Database) deleteToken(id int64) error {
 func (d *Database) nameExistsExcept(name string, exceptID int64) (bool, error) {
 	var count int
 	err := d.db.QueryRow(fmt.Sprintf(
-		`SELECT COUNT(*) FROM %s WHERE name = ? AND id != ?`, d.tableName,
+		`SELECT COUNT(*) FROM %s WHERE name = %s AND id != %s`, d.tableName, d.ph(1), d.ph(2),
 	), name, exceptID).Scan(&count)
 	return count > 0, err
 }

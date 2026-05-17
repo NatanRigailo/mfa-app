@@ -72,7 +72,7 @@
 {{ end }}
 
 {{ define "scripts" }}
-<script>
+<script nonce="{{ .Nonce }}">
     const liveCodes = {};
 
     function secondsTillNext() {
