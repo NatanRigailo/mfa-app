@@ -70,7 +70,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: mfa-app
-          image: ghcr.io/natanrigailo/mfa-app:2.0.0  # replace with the desired version tag
+          image: ghcr.io/natanrigailo/mfa-app:v2.0.0  # replace with the desired version tag
           ports:
             - containerPort: 8080
           envFrom:
