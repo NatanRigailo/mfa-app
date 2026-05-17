@@ -91,9 +91,11 @@ jobs:
       - name: Push Helm chart to GHCR
         env:
           TAG: ${{ needs.tag.outputs.new_tag }}
+          HELM_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${TAG#v}"
-          helm registry login ghcr.io --username "${{ github.actor }}" --password "${{ secrets.GITHUB_TOKEN }}"
+          echo "${HELM_REGISTRY_PASSWORD}" | helm registry login ghcr.io \
+            --username "${{ github.actor }}" --password-stdin
           helm push "mfa-app-${VERSION}.tgz" oci://ghcr.io/natanrigailo
 
       - name: Create GitHub Release
