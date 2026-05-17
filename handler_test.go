@@ -1354,3 +1354,52 @@ func TestImportPost_NonTOTPSkipped(t *testing.T) {
 		t.Errorf("expected only TOTP token, got %+v", tokens)
 	}
 }
+
+func TestExportGet_DBError(t *testing.T) {
+	app := testApp(t)
+	app.db.Close() //nolint:errcheck
+
+	sess := Session{CSRFToken: "tok", EditMode: true}
+	r := httptest.NewRequest("GET", "/export", nil)
+	r.AddCookie(signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.exportGet(w, r)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("want 500, got %d", w.Code)
+	}
+}
+
+func TestImportPost_WrongVersion(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok", EditMode: true}
+
+	body := `{"version":2,"header":{"slots":null,"params":null},"db":{"version":3,"entries":[]}}`
+	r := importFileRequest(t, "tok", body, signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+
+	flash := responseSession(t, app.cfg.SecretKey, w).Flashes
+	if len(flash) == 0 || flash[0].Category != "error" {
+		t.Errorf("expected error flash for wrong version")
+	}
+}
+
+func TestImportPost_DBError(t *testing.T) {
+	app := testApp(t)
+	sess := Session{CSRFToken: "tok", EditMode: true}
+
+	entries := []aegisEntry{
+		{Type: "totp", Name: "GitHub", Info: aegisInfo{Secret: "JBSWY3DPEHPK3PXP", Algo: "SHA1", Digits: 6, Period: 30}},
+	}
+	app.db.Close() //nolint:errcheck
+
+	r := importFileRequest(t, "tok", validAegisJSON(entries), signedCookie(app.cfg.SecretKey, sess))
+	w := httptest.NewRecorder()
+	app.importPost(w, r)
+
+	flash := responseSession(t, app.cfg.SecretKey, w).Flashes
+	if len(flash) == 0 || flash[0].Category != "error" {
+		t.Errorf("expected error flash on db error")
+	}
+}

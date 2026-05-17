@@ -279,6 +279,9 @@ type importEntry struct {
 }
 
 func (d *Database) importTokens(entries []importEntry) (imported, skipped int, err error) {
+	checkQ := fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE name = %s`, d.tableName, d.ph(1))
+	insertQ := fmt.Sprintf(`INSERT INTO %s (name, secret, ativo) VALUES (%s, %s, 1)`, d.tableName, d.ph(1), d.ph(2))
+
 	tx, err := d.db.Begin()
 	if err != nil {
 		return 0, 0, err
@@ -287,18 +290,14 @@ func (d *Database) importTokens(entries []importEntry) (imported, skipped int, e
 
 	for _, e := range entries {
 		var count int
-		if err := tx.QueryRow(fmt.Sprintf(
-			`SELECT COUNT(*) FROM %s WHERE name = %s`, d.tableName, d.ph(1),
-		), e.name).Scan(&count); err != nil {
+		if err := tx.QueryRow(checkQ, e.name).Scan(&count); err != nil {
 			return imported, skipped, err
 		}
 		if count > 0 {
 			skipped++
 			continue
 		}
-		if _, err := tx.Exec(fmt.Sprintf(
-			`INSERT INTO %s (name, secret, ativo) VALUES (%s, %s, 1)`, d.tableName, d.ph(1), d.ph(2),
-		), e.name, e.secret); err != nil {
+		if _, err := tx.Exec(insertQ, e.name, e.secret); err != nil {
 			return imported, skipped, err
 		}
 		imported++
