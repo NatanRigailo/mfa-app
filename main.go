@@ -128,7 +128,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
 				"script-src 'self' 'nonce-"+nonce+"' cdn.jsdelivr.net; "+
-				"style-src 'self' 'unsafe-inline' fonts.googleapis.com; "+
+				"style-src 'self' 'nonce-"+nonce+"' fonts.googleapis.com; "+
 				"font-src fonts.gstatic.com; "+
 				"img-src 'self' data:; "+
 				"frame-ancestors 'none'; "+

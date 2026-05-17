@@ -36,8 +36,9 @@ func TestSecurityHeaders(t *testing.T) {
 	}
 	for _, part := range strings.Split(csp, ";") {
 		part = strings.TrimSpace(part)
-		if strings.HasPrefix(part, "script-src") && strings.Contains(part, "'unsafe-inline'") {
-			t.Errorf("CSP script-src must not contain 'unsafe-inline', got: %s", part)
+		if (strings.HasPrefix(part, "script-src") || strings.HasPrefix(part, "style-src")) &&
+			strings.Contains(part, "'unsafe-inline'") {
+			t.Errorf("CSP %s must not contain 'unsafe-inline'", strings.Fields(part)[0])
 		}
 	}
 	if capturedNonce == "" {
