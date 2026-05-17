@@ -108,20 +108,34 @@ func (a *App) render(w http.ResponseWriter, page string, data any) {
 	}
 }
 
+type contextKey string
+
+const nonceKey contextKey = "nonce"
+
+func generateNonce() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		panic("failed to generate CSP nonce")
+	}
+	return fmt.Sprintf("%x", b)
+}
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nonce := generateNonce()
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
-				"script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; "+
+				"script-src 'self' 'nonce-"+nonce+"' cdn.jsdelivr.net; "+
 				"style-src 'self' 'unsafe-inline' fonts.googleapis.com; "+
 				"font-src fonts.gstatic.com; "+
 				"img-src 'self' data:; "+
 				"frame-ancestors 'none'; "+
 				"form-action 'self'; "+
 				"base-uri 'self'")
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), nonceKey, nonce)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

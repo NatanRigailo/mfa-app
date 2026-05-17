@@ -29,6 +29,7 @@ type PageData struct {
 	Flashes   []Flash
 	EditMode  bool
 	Groups    []LetterGroup
+	Nonce     string
 }
 
 type LetterGroup struct {
@@ -39,11 +40,13 @@ type LetterGroup struct {
 // pageData is called by GET handlers: reads session and pops flashes for rendering.
 func (a *App) pageData(r *http.Request) (Session, PageData) {
 	sess := getSession(r, a.cfg.SecretKey)
+	nonce, _ := r.Context().Value(nonceKey).(string)
 	return sess, PageData{
 		AppName:   a.cfg.AppName,
 		CSRFToken: sess.CSRFToken,
 		Flashes:   sess.popFlashes(),
 		EditMode:  sess.EditMode,
+		Nonce:     nonce,
 	}
 }
 

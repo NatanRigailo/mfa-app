@@ -9,7 +9,9 @@ import (
 )
 
 func TestSecurityHeaders(t *testing.T) {
+	var capturedNonce string
 	handler := securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedNonce, _ = r.Context().Value(nonceKey).(string)
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -31,6 +33,18 @@ func TestSecurityHeaders(t *testing.T) {
 		if !strings.Contains(csp, directive) {
 			t.Errorf("CSP missing directive %q", directive)
 		}
+	}
+	for _, part := range strings.Split(csp, ";") {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "script-src") && strings.Contains(part, "'unsafe-inline'") {
+			t.Errorf("CSP script-src must not contain 'unsafe-inline', got: %s", part)
+		}
+	}
+	if capturedNonce == "" {
+		t.Error("nonce not set in request context")
+	}
+	if !strings.Contains(csp, "'nonce-"+capturedNonce+"'") {
+		t.Errorf("CSP script-src missing nonce %q", capturedNonce)
 	}
 }
 
