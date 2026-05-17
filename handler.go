@@ -21,7 +21,13 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
-const registerPath = "/register"
+const (
+	registerPath    = "/register"
+	contentTypeJSON = "application/json"
+	headerCT        = "Content-Type"
+	msgInternalErr  = "internal error"
+	msgInvalidCSRF  = "Token de segurança inválido."
+)
 
 type PageData struct {
 	AppName   string
@@ -76,7 +82,7 @@ func groupTokens(tokens []Token) []LetterGroup {
 }
 
 func (a *App) healthz(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerCT, contentTypeJSON)
 	if err := a.db.Ping(); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		json.NewEncoder(w).Encode(map[string]string{"status": "error", "db": err.Error()}) //nolint:errcheck,gosec
@@ -97,7 +103,7 @@ func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
 	tokens, err := a.db.activeTokens()
 	if err != nil {
 		slog.Error("get_new_codes: db error", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
 		return
 	}
 
@@ -112,7 +118,7 @@ func (a *App) getNewCodes(w http.ResponseWriter, r *http.Request) {
 		codes[t.Name] = code
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerCT, contentTypeJSON)
 	json.NewEncoder(w).Encode(map[string]any{"codes": codes}) //nolint:errcheck,gosec
 }
 
@@ -128,7 +134,7 @@ func (a *App) index(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		slog.Error("index: db error", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
 		return
 	}
 
@@ -208,7 +214,7 @@ func (a *App) toggleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !sess.validCSRF(r.FormValue("csrf_token")) {
-		redirect("error", "Token de segurança inválido.")
+		redirect("error", msgInvalidCSRF)
 		return
 	}
 
@@ -246,7 +252,7 @@ func (a *App) deleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !sess.validCSRF(r.FormValue("csrf_token")) {
-		redirect("error", "Token de segurança inválido.")
+		redirect("error", msgInvalidCSRF)
 		return
 	}
 
@@ -443,7 +449,7 @@ func (a *App) exportGet(w http.ResponseWriter, r *http.Request) {
 	tokens, err := a.db.allTokens()
 	if err != nil {
 		slog.Error("export: db error", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
 		return
 	}
 
@@ -467,11 +473,11 @@ func (a *App) exportGet(w http.ResponseWriter, r *http.Request) {
 	data, err := json.MarshalIndent(vault, "", "  ")
 	if err != nil {
 		slog.Error("export: marshal error", "err", err)
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, msgInternalErr, http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerCT, contentTypeJSON)
 	w.Header().Set("Content-Disposition", `attachment; filename="mfa-export.json"`)
 	w.Write(data) //nolint:errcheck
 }
@@ -496,7 +502,7 @@ func (a *App) importPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !sess.validCSRF(r.FormValue("csrf_token")) {
-		redirect("error", "Token de segurança inválido.")
+		redirect("error", msgInvalidCSRF)
 		return
 	}
 
