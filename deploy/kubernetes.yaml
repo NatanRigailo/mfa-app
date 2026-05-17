@@ -62,6 +62,7 @@ spec:
       labels:
         app: mfa-app
     spec:
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
