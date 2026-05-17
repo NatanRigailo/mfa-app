@@ -1,0 +1,97 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/natanrigailo/mfa-app
+  pullPolicy: IfNotPresent
+  # Overrides the image tag. Defaults to the chart appVersion.
+  tag: ""
+
+# Application configuration — maps to env vars
+config:
+  appName: "MFA Tokens"
+  logLevel: "INFO"
+  tableName: "mfa_tokens"
+  sqlitePath: "/data/tokens.db"
+  registerAble: "true"
+  maxUploadMb: "5"
+
+  # Secrets — set via --set or a sealed secret / external-secrets operator
+  secretKey: ""   # SECRET_KEY
+  editPass: ""    # EDIT_PASS
+  apiToken: ""    # API_TOKEN (optional)
+
+  # Database — leave empty to use SQLite
+  dbDriver: ""    # "postgres" or "mysql"
+  dbHost: ""      # DB_HOST
+  dbUser: ""      # DB_USER
+  dbPassword: ""  # DB_PASSWORD
+  dbDatabase: ""  # DB_DATABASE
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Standard Kubernetes Ingress
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: mfa.example.com
+  tls:
+    enabled: false
+    secretName: mfa-app-tls
+
+# Gateway API HTTPRoute (mutually exclusive with ingress)
+httpRoute:
+  enabled: false
+  parentRefs:
+    - name: my-gateway
+      namespace: infra
+  host: mfa.example.com
+  tls: false
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 5
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 3
+  periodSeconds: 10
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

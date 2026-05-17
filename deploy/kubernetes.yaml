@@ -1,0 +1,123 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mfa-app
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mfa-app
+  namespace: mfa-app
+data:
+  APP_NAME: "MFA Tokens"
+  LOG_LEVEL: "INFO"
+  TABLE_NAME: "mfa_tokens"
+  SQLITE_PATH: "/data/tokens.db"
+  REGISTER_ABLE: "true"
+  MAX_UPLOAD_MB: "5"
+  # DB_DRIVER: "postgres"
+  # DB_HOST: "postgres:5432"
+  # DB_USER: "mfa"
+  # DB_DATABASE: "mfa"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mfa-app
+  namespace: mfa-app
+type: Opaque
+stringData:
+  SECRET_KEY: "change-me"
+  EDIT_PASS: "change-me"
+  API_TOKEN: ""
+  # DB_PASSWORD: "change-me"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mfa-app-data
+  namespace: mfa-app
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mfa-app
+  namespace: mfa-app
+  labels:
+    app: mfa-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mfa-app
+  template:
+    metadata:
+      labels:
+        app: mfa-app
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: mfa-app
+          image: ghcr.io/natanrigailo/mfa-app:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: mfa-app
+            - secretRef:
+                name: mfa-app
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mfa-app-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mfa-app
+  namespace: mfa-app
+spec:
+  selector:
+    app: mfa-app
+  ports:
+    - port: 80
+      targetPort: 8080
