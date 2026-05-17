@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // registers the "postgres" driver with database/sql
 	_ "modernc.org/sqlite"
 )
 
