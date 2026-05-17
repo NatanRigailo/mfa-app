@@ -31,6 +31,29 @@ jobs:
       - name: Run actionlint
         uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
 
+      - name: Set up Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4
+
+      - name: Lint Helm chart
+        run: helm lint deploy/helm/mfa-app/
+
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate Kubernetes manifest
+        run: kubeconform -strict -summary deploy/kubernetes.yaml
+
+      - name: Validate rendered Helm templates
+        run: |
+          helm template mfa-app deploy/helm/mfa-app/ \
+            --set config.secretKey=ci \
+            --set config.editPass=ci \
+            | kubeconform -strict -summary -
+
   sast:
     name: SAST
     runs-on: ubuntu-latest
@@ -125,6 +148,15 @@ jobs:
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
+
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: deploy/
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
 
   secret-scan:
     name: Secret Scan
